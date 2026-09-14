@@ -1,0 +1,409 @@
+--- ORIJINAL_DOSYALAR/GTD_Publish.dxl
++++ GUNCEL/GTD_Publish.dxl
+@@ -85,9 +85,9 @@
+ // Requirement source classification. These are object attributes.
+ AttrDef adSourceType = find(m, "Requirement Source Type")
+ AttrDef adSourceReference = find(m, "Requirement Source Reference")
+ if (null adSourceType || null adSourceReference) {
+-    ack "Requirement source attributes are missing.\nRun GTD_Setup_Requirement_Source_Attributes.dxl once while the module is open in Exclusive Edit mode."
++    ack "Requirement source attributes are missing.\nRun GTD_Setup_Module.dxl once while the module is open in Exclusive Edit mode."
+     halt
+ }
+ 
+ string systemName       = m."System Name" ""
+@@ -162,8 +162,9 @@
+ //   by checking the END of the normalized heading.
+ // - Parent lookup starts at parent(x), never at x itself.
+ // ------------------------------------------------------------
+ // All source characters are ASCII. Construct runtime bytes explicitly.
++// BEGIN GTD SECTION MODEL - keep identical in setup, publisher and Control.
+ string headingBytes(int first, int second, int third)
+ {
+     Buffer b = create
+     char c1 = charOf(first)
+@@ -310,8 +311,70 @@
+     }
+     return true
+ }
+ 
++const int GTD_SECTION_COUNT = 28
++string gtdSectionKeys[] = {
++    "ROOT_GENEL",
++    "AMAC",
++    "KAPSAM",
++    "PROJE_TANITIMI",
++    "SISTEM_GENEL",
++    "URUN_GENEL",
++    "GROUP_KISALTMALAR_TANIMLAR",
++    "KISALTMALAR",
++    "TANIMLAR",
++    "UYGULANABILIR_DOKUMANLAR",
++    "STANDARTLAR",
++    "DIGER_DOKUMANLAR",
++    "ROOT_SISTEM_TANIMLAMASI",
++    "DURUM_MODLAR",
++    "OMUR_DONGUSU",
++    "SINIRLAMALAR",
++    "ROOT_GEREKSINIMLER",
++    "REQ_ISLEVSEL",
++    "REQ_PERFORMANS",
++    "REQ_FIZIKSEL",
++    "REQ_ARAYUZ",
++    "REQ_CEVRESEL",
++    "REQ_EMNIYET",
++    "REQ_ELD",
++    "REQ_GUV_GIZ",
++    "REQ_ERGONOMI",
++    "REQ_MARKALAMA",
++    "REQ_BILGISAYAR"
++}
++string gtdSectionHeadings[] = {
++    "GENEL",
++    "Ama" headingBytes(195, 167, -1),
++    "Kapsam",
++    "Proje Tan" headingBytes(196, 177, -1) "t" headingBytes(196, 177, -1) "m" headingBytes(196, 177, -1),
++    "Sisteme Genel Bak" headingBytes(196, 177, -1) headingBytes(197, 159, -1),
++    headingBytes(195, 156, -1) "r" headingBytes(195, 188, -1) "ne Genel Bak" headingBytes(196, 177, -1) headingBytes(197, 159, -1),
++    "K" headingBytes(196, 177, -1) "saltmalar/Tan" headingBytes(196, 177, -1) "mlar",
++    "K" headingBytes(196, 177, -1) "saltmalar",
++    "Tan" headingBytes(196, 177, -1) "mlar",
++    "Uygulanabilir Dok" headingBytes(195, 188, -1) "manlar",
++    "Standartlar",
++    "Di" headingBytes(196, 159, -1) "er Dok" headingBytes(195, 188, -1) "manlar",
++    "S" headingBytes(196, 176, -1) "STEM" headingBytes(196, 176, -1) "N TANIMLAMASI",
++    "Durum ve Modlar",
++    headingBytes(195, 150, -1) "m" headingBytes(195, 188, -1) "r D" headingBytes(195, 182, -1) "ng" headingBytes(195, 188, -1) "s" headingBytes(195, 188, -1),
++    "S" headingBytes(196, 177, -1) "n" headingBytes(196, 177, -1) "rlamalar",
++    "GEREKS" headingBytes(196, 176, -1) "N" headingBytes(196, 176, -1) "MLER",
++    headingBytes(196, 176, -1) headingBytes(197, 159, -1) "levsel Gereksinimler",
++    "Performans Gereksinimleri",
++    "Fiziksel Gereksinimler",
++    "Aray" headingBytes(195, 188, -1) "z Gereksinimleri",
++    headingBytes(195, 135, -1) "evresel Gereksinimler",
++    "Emniyet Gereksinimleri",
++    "Entegre Lojistik Destek Gereksinimleri",
++    "G" headingBytes(195, 188, -1) "venlik ve Gizlilik Gereksinimleri",
++    "Ergonomi Gereksinimleri",
++    "Markalama ve Etiketleme Gereksinimleri",
++    "Bilgisayar Kaynak Gereksinimleri"
++}
++int gtdSectionParents[] = {-1, 0, 0, 0, 3, 3, 0, 6, 6, 0, 9, 9, -1, 12, 12, 12, -1, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16}
+ string sectionKeyForHeading(string h)
+ {
+     if (headingEndsWith(h, "amac")) return "AMAC"
+     if (headingEndsWith(h, "kapsam")) return "KAPSAM"
+@@ -340,8 +403,14 @@
+     if (headingEndsWith(h, "ergonomigereksinimleri")) return "REQ_ERGONOMI"
+     if (headingEndsWith(h, "markalamaveetiketlemegereksinimleri")) return "REQ_MARKALAMA"
+     if (headingEndsWith(h, "bilgisayarkaynakgereksinimleri")) return "REQ_BILGISAYAR"
+ 
++    if (headingEndsWith(h, "genel")) return "ROOT_GENEL"
++    if (headingEndsWith(h, "kisaltmalar/tanimlar")) return "GROUP_KISALTMALAR_TANIMLAR"
++    if (headingEndsWith(h, "kisaltmalarvetanimlar")) return "GROUP_KISALTMALAR_TANIMLAR"
++    if (headingEndsWith(h, "sistemintanimlamasi")) return "ROOT_SISTEM_TANIMLAMASI"
++    if (headingEndsWith(h, "sistemintanimi")) return "ROOT_SISTEM_TANIMLAMASI"
++    if (headingEndsWith(h, "gereksinimler")) return "ROOT_GEREKSINIMLER"
+     return ""
+ }
+ 
+ bool isContentSection(string k)
+@@ -390,28 +459,83 @@
+     if (k == "REQ_BILGISAYAR") return true
+     return false
+ }
+ 
+-// IMPORTANT: this starts at parent(x), not x.
+-// It therefore means "which recognized section contains x?"
++
++int gtdSectionIndex(string key)
++{
++    int i
++    for (i = 0; i < GTD_SECTION_COUNT; i++)
++        if (gtdSectionKeys[i] == key) return i
++    return -1
++}
++
++bool gtdBlank(string s)
++{
++    int i
++    for (i = 0; i < length(s); i++) {
++        string c = s[i:i]
++        if (c != " " && c != "\t" && c != "\r" && c != "\n") return false
++    }
++    return true
++}
++
++string gtdStoredSectionKey(Object o)
++{
++    if (null o) return ""
++    Module om = module(o)
++    AttrDef ad = find(om, "GTD Section Key")
++    if (null ad || !ad.object) return ""
++    return o."GTD Section Key" ""
++}
++
++string sectionKeyForObject(Object o)
++{
++    if (null o || isDeleted(o)) return ""
++    if (table(o) || row(o) || cell(o)) return ""
++    if (!gtdBlank(getPictName(o))) return ""
++    string h = o."Object Heading" ""
++    if (gtdBlank(h)) return ""
++    string key = gtdStoredSectionKey(o)
++    // A nonempty unknown key must not fall back to the visible title.
++    if (!gtdBlank(key)) {
++        if (gtdSectionIndex(key) >= 0) return key
++        return ""
++    }
++    return sectionKeyForHeading(h)
++}
++
++string gtdSectionIdentityIssue(Object o)
++{
++    string stored = gtdStoredSectionKey(o)
++    if (gtdBlank(stored)) return ""
++    if (table(o) || row(o) || cell(o)) return "SECTION_KEY_ON_TABLE"
++    if (gtdSectionIndex(stored) < 0) return "UNKNOWN_SECTION_KEY"
++    string h = o."Object Heading" ""
++    if (gtdBlank(h)) return "SECTION_KEY_WITHOUT_HEADING"
++    string pict = getPictName(o)
++    if (!gtdBlank(pict)) return "SECTION_KEY_ON_PICTURE"
++    string titleKey = sectionKeyForHeading(h)
++    if (titleKey != "" && titleKey != stored) return "SECTION_KEY_TITLE_CONFLICT"
++    return ""
++}
++
++// Start at the parent: a section heading is not its own requirement.
++// A recognized container closes the search; do not inherit a stale section.
+ string sectionKeyFromParents(Object x)
+ {
+     Object p = parent(x)
+-
+     while (!null p) {
+-        if (!table(p) && !row(p) && !cell(p)) {
+-            string h = p."Object Heading" ""
+-            string k = sectionKeyForHeading(h)
+-
+-            if (k != "")
+-                return k
+-        }
+-
++        string key = sectionKeyForObject(p)
++        if (key != "") {
++            if (isContentSection(key)) return key
++            return ""
++        }
+         p = parent(p)
+     }
+-
+     return ""
+ }
++// END GTD SECTION MODEL
+ 
+ // Self-check both source encodings before processing module objects.
+ string checkAnsi = "Ama" headingBytes(231, -1, -1)
+ string checkUtf8 = "Ama" headingBytes(195, 167, -1)
+@@ -424,8 +548,77 @@
+     ack "Heading normalization self-check failed. Export stopped."
+     halt
+ }
+ 
++
++// Managed modules use hierarchy, never the legacy sibling fallback.
++AttrDef gtdKeyAttr = find(m, "GTD Section Key")
++bool gtdManagedStructure = !null gtdKeyAttr
++if (gtdManagedStructure) {
++    Buffer structureIssues = create
++    if (gtdBlank(systemName) || gtdBlank(documentNumber) || gtdBlank(documentRevision) ||
++        gtdBlank(documentDate) || gtdBlank(projectName) || gtdBlank(projectNumber) ||
++        gtdBlank(department) || gtdBlank(classification) || gtdBlank(m."Prefix" ""))
++        structureIssues += "Required document metadata is missing; run GTD_Module_Info.dxl.\n"
++    AttrDef setupStateAttr = find(m, "GTD Setup State")
++    if (null setupStateAttr || !setupStateAttr.module)
++        structureIssues += "GTD Setup State missing; run GTD_Setup_Module.dxl.\n"
++    else {
++        string setupState = m."GTD Setup State" ""
++        if (setupState != "READY")
++            structureIssues += "Setup is incomplete; resolve the setup log and run it again.\n"
++    }
++    int sectionCount[GTD_SECTION_COUNT]
++    int si
++    for (si = 0; si < GTD_SECTION_COUNT; si++) sectionCount[si] = 0
++    Object checkObject
++    for checkObject in entire m do {
++        if (isDeleted(checkObject)) continue
++        string issue = gtdSectionIdentityIssue(checkObject)
++        if (issue != "") structureIssues += identifier(checkObject) " : " issue "\n"
++        if (table(checkObject) || row(checkObject) || cell(checkObject)) continue
++        string key = sectionKeyForObject(checkObject)
++        int idx = gtdSectionIndex(key)
++        if (idx >= 0) {
++            sectionCount[idx]++
++            Object p = parent(checkObject)
++            int pi = gtdSectionParents[idx]
++            string expectedParent = ""
++            if (pi >= 0) expectedParent = gtdSectionKeys[pi]
++            string actualParent = sectionKeyForObject(p)
++            bool wrongParent = false
++            if (pi < 0 && !null p) wrongParent = true
++            if (pi >= 0 && (null p || actualParent != expectedParent)) wrongParent = true
++            if (wrongParent) structureIssues += identifier(checkObject) " : WRONG_PARENT " key "\n"
++        }
++        string rt = checkObject."Requirement Type" ""
++        string txt = checkObject."Object Text" ""
++        string head = checkObject."Object Heading" ""
++        if (!gtdBlank(rt) && !gtdBlank(txt) && gtdBlank(head) && gtdBlank(getPictName(checkObject))) {
++            string containing = sectionKeyFromParents(checkObject)
++            if (!isRequirementSection(containing))
++                structureIssues += identifier(checkObject) " : REQUIREMENT_OUTSIDE_SECTION\n"
++        }
++    }
++    for (si = 0; si < GTD_SECTION_COUNT; si++)
++        if (sectionCount[si] != 1)
++            structureIssues += gtdSectionKeys[si] " : expected one heading; found " sectionCount[si] "\n"
++    if (length(stringOf(structureIssues)) > 0) {
++        string structureLog = tempFileName() "_GTD_Structure_Check.txt"
++        Stream structureOut = write(structureLog)
++        if (!null structureOut) {
++            structureOut << stringOf(structureIssues)
++            close(structureOut)
++        }
++        print stringOf(structureIssues)
++        close(out)
++        ack "GTD bolum yapisi tamamlanmamis. Yayin durduruldu.\nSetup'i tekrar calistirin.\n\nKontrol raporu:\n" structureLog
++        delete(structureIssues)
++        halt
++    }
++    delete(structureIssues)
++}
++
+ bool oldTableContents = tableContents(m)
+ tableContents(true)
+ 
+ Object so
+@@ -454,12 +647,12 @@
+             ownHeading = so."Object Heading" ""
+             ownLevel = level(so)
+ 
+             if (ownHeading != "")
+-                ownSection = sectionKeyForHeading(ownHeading)
+-
+-            // A recognized heading ALWAYS wins and immediately becomes active.
+-            if (ownSection != "") {
++                ownSection = sectionKeyForObject(so)
++
++            // A content heading becomes active; a container closes sibling context.
++            if (isContentSection(ownSection)) {
+                 activeSection = ownSection
+                 activeSectionLevel = ownLevel
+             }
+             else if (ownHeading != "") {
+@@ -476,16 +669,16 @@
+         if (!table(so) && !row(so) && !cell(so)) {
+ 
+             string narrativeSection = ""
+ 
+-            string directSection = sectionKeyForHeading(ownHeading)
++            string directSection = sectionKeyForObject(so)
+ 
+             if (directSection != "")
+                 narrativeSection = directSection
+             else {
+                 narrativeSection = sectionKeyFromParents(so)
+ 
+-                if (narrativeSection == "")
++                if (narrativeSection == "" && !gtdManagedStructure)
+                     narrativeSection = activeSection
+             }
+ 
+             if (narrativeSection == "") {
+@@ -506,9 +699,9 @@
+                 // the REQ branch below. Any other Object Text is a normal TEXT
+                 // event and remains in sequence.
+                 bool emitAsText = true
+ 
+-                if (isRequirementSection(narrativeSection) && sectionReqType != "")
++                if (isRequirementSection(narrativeSection) && sectionReqType != "" && gtdBlank(ownHeading) && gtdBlank(getPictName(so)))
+                     emitAsText = false
+ 
+                 if (sectionText != "" && emitAsText && isRequirementSection(narrativeSection)) {
+                     string noTypeId = safeField(identifier(so))
+@@ -533,25 +726,25 @@
+         if (!table(so) && !row(so) && !cell(so)) {
+ 
+             string orderedSection = ""
+ 
+-            string directReqSection = sectionKeyForHeading(ownHeading)
++            string directReqSection = sectionKeyForObject(so)
+ 
+             if (directReqSection != "")
+                 orderedSection = directReqSection
+             else {
+                 orderedSection = sectionKeyFromParents(so)
+ 
+-                if (orderedSection == "")
++                if (orderedSection == "" && !gtdManagedStructure)
+                     orderedSection = activeSection
+             }
+ 
+             if (orderedSection != "" && isRequirementSection(orderedSection)) {
+ 
+                 string orderedReqType = so."Requirement Type" ""
+                 string orderedReqText = so."Object Text" ""
+ 
+-                if (orderedReqType != "" && orderedReqText != "") {
++                if (orderedReqType != "" && orderedReqText != "" && gtdBlank(ownHeading) && gtdBlank(getPictName(so))) {
+ 
+                     string orderedReqId = identifier(so)
+                     string orderedVerMethod = so."Verification Method" ""
+                     string orderedVerRef = so."Verification Reference" ""
+@@ -574,14 +767,14 @@
+             string pictureName = getPictName(so)
+ 
+             if (!null pictureName && pictureName != "") {
+ 
+-                string pictureSection = sectionKeyForHeading(ownHeading)
++                string pictureSection = sectionKeyForObject(so)
+ 
+                 if (pictureSection == "") {
+                     pictureSection = sectionKeyFromParents(so)
+ 
+-                    if (pictureSection == "")
++                    if (pictureSection == "" && !gtdManagedStructure)
+                         pictureSection = activeSection
+                 }
+ 
+                 string sfPictureId = safeField(identifier(so))
+@@ -629,9 +822,9 @@
+ 
+             string tableSection = sectionKeyFromParents(so)
+ 
+             // Table header can be a sibling immediately after a mapped heading.
+-            if (tableSection == "")
++            if (tableSection == "" && !gtdManagedStructure)
+                 tableSection = activeSection
+ 
+             string sfTableId = safeField(identifier(so))
+ 
+@@ -695,9 +888,9 @@
+     if (!isDeleted(o) && !table(o) && !row(o) && !cell(o)) {
+     string reqType = o."Requirement Type" ""
+     string objText = o."Object Text" ""
+ 
+-    if (reqType != "" && objText != "") {
++    if (reqType != "" && objText != "" && gtdBlank(o."Object Heading" "") && gtdBlank(getPictName(o))) {
+ 
+         string reqId = identifier(o)
+         string verMethod = o."Verification Method" ""
+         string verRef = o."Verification Reference" ""
+@@ -763,10 +956,8 @@
+                 string sfTraceSourceId = safeField(traceSourceId)
+                 string sfTraceSourceModule = safeField(traceSourceModule)
+                 out << "X|" << sfReqId << "|" << sfTraceSourceId << "|" << sfTraceSourceModule << "|" << sfActualLinkPath << "|" << traceStatus << "\n"
+             }
+-            else {
+-            }
+         }
+         if (matchedTraceLinks == 0) {
+             out << "X|" << sfReqId << "||||NONE\n"
+         }

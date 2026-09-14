@@ -1,0 +1,13 @@
+--- ORIJINAL_DOSYALAR/GTD_Install_Open_Trigger(1).dxl
++++ GUNCEL/GTD_Install_Open_Trigger.dxl
+@@ -100,9 +100,9 @@
+     gtdTriggerCode += "\n"
+     gtdTriggerCode += "    string templateVersion = gtdModule.\"GTD Template Version\" \"\"\n"
+     gtdTriggerCode += "    string formPath = gtdModule.\"GTD Form Path\" \"\"\n"
+     gtdTriggerCode += "\n"
+-    gtdTriggerCode += "    // Master/template marker is not configured: silently ignore.\n"
++    gtdTriggerCode += "    // GTD setup marker is not configured: silently ignore.\n"
+     gtdTriggerCode += "    if (templateVersion == \"\" || formPath == \"\")\n"
+     gtdTriggerCode += "        return\n"
+     gtdTriggerCode += "\n"
+     gtdTriggerCode += "    Buffer missing = create\n"

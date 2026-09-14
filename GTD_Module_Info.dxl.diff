@@ -1,0 +1,12 @@
+--- ORIJINAL_DOSYALAR/GTD_Module_Info(1).dxl
++++ GUNCEL/GTD_Module_Info.dxl
+@@ -17,9 +17,9 @@
+ // Optional:
+ //   Work Package
+ //   SDVIL Number
+ //
+-// Assumes the GTD master/setup has already created the module attributes.
++// Run GTD_Setup_Module.dxl first to create the module attributes.
+ // ============================================================
+ 
+ pragma runLim, 0

@@ -1,0 +1,398 @@
+// ============================================================
+// GTD Requirement Review - Control Layout DXL
+//
+// Checks:
+//   1) Requirement Type exists and matches containing section
+//   2) Verification Method exists
+//   3) Requirement source definition is consistent
+//
+// Non-requirement objects are ignored:
+//   - picture objects
+//   - native tables / rows / cells
+//   - headings / objects without Object Text
+//   - objects outside requirement sections
+//
+// Source rules:
+//   Higher-Level Requirement -> source trace link required
+//   Derived                  -> source trace link must NOT exist
+//   Standard / Regulation    -> Requirement Source Reference required
+//   Interface                -> Requirement Source Reference required
+//   Safety Analysis          -> Requirement Source Reference required
+//   Other                    -> Requirement Source Reference required
+// ============================================================
+
+pragma runLim, 0
+
+// ------------------------------------------------------------
+// Encoding-safe Turkish heading normalization copied from the
+// GTD publisher logic. Source code remains ASCII-only.
+// ------------------------------------------------------------
+string headingBytes(int first, int second, int third)
+{
+    Buffer b = create
+    char c1 = charOf(first)
+    b += c1
+    if (second >= 0) {
+        char c2 = charOf(second)
+        b += c2
+    }
+    if (third >= 0) {
+        char c3 = charOf(third)
+        b += c3
+    }
+    string result = stringOf(b)
+    delete(b)
+    return result
+}
+
+string replaceHeadingToken(string s, string token, string replacement)
+{
+    Buffer b = create
+    int i = 0
+    int n = length(s)
+    int t = length(token)
+
+    while (i < n) {
+        bool matched = false
+        if (i + t <= n) {
+            string part = s[i:(i + t - 1)]
+            if (part == token) matched = true
+        }
+
+        if (matched) {
+            b += replacement
+            i = i + t
+        }
+        else {
+            b += s[i:i]
+            i++
+        }
+    }
+
+    string result = stringOf(b)
+    delete(b)
+    return result
+}
+
+string compactHeading(string s)
+{
+    string token = ""
+
+    // UTF-8 Turkish letters.
+    token = headingBytes(195, 135, -1)
+    s = replaceHeadingToken(s, token, "c")
+    token = headingBytes(195, 167, -1)
+    s = replaceHeadingToken(s, token, "c")
+    token = headingBytes(196, 158, -1)
+    s = replaceHeadingToken(s, token, "g")
+    token = headingBytes(196, 159, -1)
+    s = replaceHeadingToken(s, token, "g")
+    token = headingBytes(196, 176, -1)
+    s = replaceHeadingToken(s, token, "i")
+    token = headingBytes(196, 177, -1)
+    s = replaceHeadingToken(s, token, "i")
+    token = headingBytes(195, 150, -1)
+    s = replaceHeadingToken(s, token, "o")
+    token = headingBytes(195, 182, -1)
+    s = replaceHeadingToken(s, token, "o")
+    token = headingBytes(197, 158, -1)
+    s = replaceHeadingToken(s, token, "s")
+    token = headingBytes(197, 159, -1)
+    s = replaceHeadingToken(s, token, "s")
+    token = headingBytes(195, 156, -1)
+    s = replaceHeadingToken(s, token, "u")
+    token = headingBytes(195, 188, -1)
+    s = replaceHeadingToken(s, token, "u")
+
+    // Windows-1254 Turkish letters.
+    token = headingBytes(199, -1, -1)
+    s = replaceHeadingToken(s, token, "c")
+    token = headingBytes(231, -1, -1)
+    s = replaceHeadingToken(s, token, "c")
+    token = headingBytes(208, -1, -1)
+    s = replaceHeadingToken(s, token, "g")
+    token = headingBytes(240, -1, -1)
+    s = replaceHeadingToken(s, token, "g")
+    token = headingBytes(221, -1, -1)
+    s = replaceHeadingToken(s, token, "i")
+    token = headingBytes(253, -1, -1)
+    s = replaceHeadingToken(s, token, "i")
+    token = headingBytes(214, -1, -1)
+    s = replaceHeadingToken(s, token, "o")
+    token = headingBytes(246, -1, -1)
+    s = replaceHeadingToken(s, token, "o")
+    token = headingBytes(222, -1, -1)
+    s = replaceHeadingToken(s, token, "s")
+    token = headingBytes(254, -1, -1)
+    s = replaceHeadingToken(s, token, "s")
+    token = headingBytes(220, -1, -1)
+    s = replaceHeadingToken(s, token, "u")
+    token = headingBytes(252, -1, -1)
+    s = replaceHeadingToken(s, token, "u")
+
+    // Common non-breaking / zero-width spaces.
+    token = headingBytes(194, 160, -1)
+    s = replaceHeadingToken(s, token, "")
+    token = headingBytes(226, 128, 175)
+    s = replaceHeadingToken(s, token, "")
+    token = headingBytes(226, 128, 139)
+    s = replaceHeadingToken(s, token, "")
+    token = headingBytes(160, -1, -1)
+    s = replaceHeadingToken(s, token, "")
+
+    string upperChars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+    string lowerChars = "abcdefghijklmnopqrstuvwxyz"
+    Buffer b = create
+    int i
+    int j
+    int n = length(s)
+
+    for (i = 0; i < n; i++) {
+        string ch = s[i:i]
+
+        for (j = 0; j < 26; j++) {
+            if (ch == upperChars[j:j]) {
+                ch = lowerChars[j:j]
+                break
+            }
+        }
+
+        if (ch != " " && ch != "\t" && ch != "\r" && ch != "\n" && ch != ":")
+            b += ch
+    }
+
+    string result = stringOf(b)
+    delete(b)
+    return result
+}
+
+bool headingEndsWith(string h, string suffix)
+{
+    string c = compactHeading(h)
+    string s = compactHeading(suffix)
+    int lc = length(c)
+    int ls = length(s)
+
+    if (ls == 0 || lc < ls) return false
+
+    string tail = c[(lc - ls):(lc - 1)]
+    if (tail != s) return false
+
+    // Only allow a numeric/manual numbering prefix before the heading.
+    int i
+    for (i = 0; i < lc - ls; i++) {
+        string ch = c[i:i]
+        if (ch != "0" && ch != "1" && ch != "2" && ch != "3" && ch != "4" &&
+            ch != "5" && ch != "6" && ch != "7" && ch != "8" && ch != "9" &&
+            ch != "." && ch != ")" && ch != "(" && ch != "-")
+            return false
+    }
+
+    return true
+}
+
+string requirementSectionKeyForHeading(string h)
+{
+    if (headingEndsWith(h, "islevselgereksinimleri")) return "REQ_ISLEVSEL"
+    if (headingEndsWith(h, "islevselgereksinimler")) return "REQ_ISLEVSEL"
+    if (headingEndsWith(h, "performansgereksinimleri")) return "REQ_PERFORMANS"
+    if (headingEndsWith(h, "fizikselgereksinimler")) return "REQ_FIZIKSEL"
+    if (headingEndsWith(h, "arayuzgereksinimleri")) return "REQ_ARAYUZ"
+    if (headingEndsWith(h, "cevreselgereksinimler")) return "REQ_CEVRESEL"
+    if (headingEndsWith(h, "emniyetgereksinimleri")) return "REQ_EMNIYET"
+    if (headingEndsWith(h, "entegrelojistikdestekgereksinimleri")) return "REQ_ELD"
+    if (headingEndsWith(h, "guvenlikvegizlilikgereksinimleri")) return "REQ_GUV_GIZ"
+    if (headingEndsWith(h, "ergonomigereksinimleri")) return "REQ_ERGONOMI"
+    if (headingEndsWith(h, "markalamaveetiketlemegereksinimleri")) return "REQ_MARKALAMA"
+    if (headingEndsWith(h, "bilgisayarkaynakgereksinimleri")) return "REQ_BILGISAYAR"
+    return ""
+}
+
+string requirementSectionFromParents(Object x)
+{
+    Object p = parent(x)
+
+    while (!null p) {
+        if (!table(p) && !row(p) && !cell(p)) {
+            string h = p."Object Heading" ""
+            string k = requirementSectionKeyForHeading(h)
+            if (k != "") return k
+        }
+        p = parent(p)
+    }
+
+    return ""
+}
+
+string expectedTypeNormalized(string sectionKey)
+{
+    if (sectionKey == "REQ_ISLEVSEL")   return "islevsel"
+    if (sectionKey == "REQ_PERFORMANS") return "performans"
+    if (sectionKey == "REQ_FIZIKSEL")   return "fiziksel"
+    if (sectionKey == "REQ_ARAYUZ")     return "arayuz"
+    if (sectionKey == "REQ_CEVRESEL")   return "cevresel"
+    if (sectionKey == "REQ_EMNIYET")    return "emniyet"
+    if (sectionKey == "REQ_ELD")        return "entegrelojistikdestek"
+    if (sectionKey == "REQ_GUV_GIZ")    return "guvenlikvegizlilik"
+    if (sectionKey == "REQ_ERGONOMI")   return "ergonomi"
+    if (sectionKey == "REQ_MARKALAMA")  return "markalamaveetiketleme"
+    if (sectionKey == "REQ_BILGISAYAR") return "bilgisayarkaynak"
+    return ""
+}
+
+bool isBlank(string s)
+{
+    int i
+    int n = length(s)
+    if (n == 0) return true
+
+    for (i = 0; i < n; i++) {
+        string ch = s[i:i]
+        if (ch != " " && ch != "\t" && ch != "\r" && ch != "\n")
+            return false
+    }
+
+    return true
+}
+
+void addIssue(Buffer b, string issue)
+{
+    string currentText = stringOf(b)
+    if (currentText != "") b += " | "
+    b += issue
+}
+
+int sourceLinkCount(Object o, string traceLinkModulePath)
+{
+    if (traceLinkModulePath == "") return 0
+
+    int count = 0
+    Link traceLink
+
+    for traceLink in all(o->"*") do {
+        Module traceLinkModule = module(traceLink)
+        if (!null traceLinkModule) {
+            string actualLinkPath = fullName(traceLinkModule)
+            if (actualLinkPath == traceLinkModulePath)
+                count++
+        }
+    }
+
+    return count
+}
+
+// ------------------------------------------------------------
+// Layout DXL execution for the current row/object.
+// ------------------------------------------------------------
+Object o = obj
+
+if (null o) {
+    display ""
+}
+else if (table(o) || row(o) || cell(o)) {
+    display ""
+}
+else {
+    string pictureName = getPictName(o)
+
+    // Native picture objects are document content, not requirements.
+    if (!null pictureName && pictureName != "") {
+        display ""
+    }
+    else {
+        string objectText = o."Object Text" ""
+        string sectionKey = requirementSectionFromParents(o)
+
+        // Headings, narrative objects and anything outside requirement
+        // sections are intentionally not checked.
+        if (isBlank(objectText) || sectionKey == "") {
+            display ""
+        }
+        else {
+            Buffer issues = create
+
+            string reqType = o."Requirement Type" ""
+            string verificationMethod = o."Verification Method" ""
+
+            bool typeMissing = isBlank(reqType)
+            bool verificationMissing = isBlank(verificationMethod)
+
+            if (typeMissing && verificationMissing) {
+                addIssue(issues, "EKSIK: Tip + Dogrulama")
+            }
+            else {
+                if (typeMissing)
+                    addIssue(issues, "EKSIK: Requirement Type")
+
+                if (verificationMissing)
+                    addIssue(issues, "EKSIK: Verification Method")
+            }
+
+            if (!typeMissing) {
+                string expectedType = expectedTypeNormalized(sectionKey)
+                string actualType = compactHeading(reqType)
+
+                if (expectedType != "" && actualType != expectedType)
+                    addIssue(issues, "HATA: Yanlis Requirement Type")
+            }
+
+            // ---------------- Source validation ----------------
+            Module m = current
+
+            if (null m) {
+                addIssue(issues, "HATA: Module bulunamadi")
+            }
+            else {
+                AttrDef adSourceType = find(m, "Requirement Source Type")
+                AttrDef adSourceReference = find(m, "Requirement Source Reference")
+                AttrDef adTraceLinkModule = find(m, "GTD Trace Link Module")
+
+                if (null adSourceType || null adSourceReference) {
+                    addIssue(issues, "HATA: Kaynak attribute tanimsiz")
+                }
+                else {
+                    string sourceType = o."Requirement Source Type" ""
+                    string sourceReference = o."Requirement Source Reference" ""
+                    string traceLinkModulePath = ""
+
+                    if (!null adTraceLinkModule)
+                        traceLinkModulePath = m."GTD Trace Link Module" ""
+
+                    int matchedSourceLinks = sourceLinkCount(o, traceLinkModulePath)
+
+                    if (isBlank(sourceType)) {
+                        addIssue(issues, "EKSIK: Requirement Source Type")
+                    }
+                    else if (sourceType == "Higher-Level Requirement") {
+                        if (isBlank(traceLinkModulePath))
+                            addIssue(issues, "HATA: GTD Trace Link Module tanimsiz")
+                        else if (matchedSourceLinks == 0)
+                            addIssue(issues, "HATA: Ust seviye kaynak linki yok")
+                    }
+                    else if (sourceType == "Derived") {
+                        if (!isBlank(traceLinkModulePath) && matchedSourceLinks > 0)
+                            addIssue(issues, "HATA: Derived ama kaynak linki var")
+                    }
+                    else if (sourceType == "Standard / Regulation" ||
+                             sourceType == "Interface" ||
+                             sourceType == "Safety Analysis" ||
+                             sourceType == "Other") {
+                        if (isBlank(sourceReference))
+                            addIssue(issues, "EKSIK: Requirement Source Reference")
+                    }
+                    else {
+                        addIssue(issues, "HATA: Bilinmeyen Requirement Source Type")
+                    }
+                }
+            }
+
+            string result = stringOf(issues)
+            if (result == "")
+                display "OK"
+            else
+                display result
+
+            delete(issues)
+        }
+    }
+}

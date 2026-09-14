@@ -1,0 +1,36 @@
+PASS | Balanced DXL delimiters: GTD_Publish.dxl
+PASS | No generation placeholders: GTD_Publish.dxl
+PASS | Balanced DXL delimiters: GTD_Requirement_Review_Control.dxl
+PASS | No generation placeholders: GTD_Requirement_Review_Control.dxl
+PASS | Balanced DXL delimiters: GTD_Remove_Open_Trigger.dxl
+PASS | No generation placeholders: GTD_Remove_Open_Trigger.dxl
+PASS | Balanced DXL delimiters: GTD_Install_Open_Trigger.dxl
+PASS | No generation placeholders: GTD_Install_Open_Trigger.dxl
+PASS | Balanced DXL delimiters: GTD_Setup_Module.dxl
+PASS | No generation placeholders: GTD_Setup_Module.dxl
+PASS | Balanced DXL delimiters: GTD_Module_Info.dxl
+PASS | No generation placeholders: GTD_Module_Info.dxl
+PASS | Balanced DXL delimiters: GTD_Open_Check.dxl
+PASS | No generation placeholders: GTD_Open_Check.dxl
+PASS | The three section models are identical
+PASS | 28 unique headings with valid parents
+PASS | Setup heading text and hierarchy equal the Word template sections 1–3
+PASS | 24 content keys cover every Word placeholder exactly once
+PASS | PowerShell consumes all 24 mapped sections
+PASS | New verification choices match Word section 4
+PASS | All six requirement source choices are preserved
+PASS | Every literal custom attribute read is created by setup
+PASS | Setup has no object move, delete, link or enum modify operation
+PASS | Setup writes only heading text and section key on objects
+PASS | Setup never assigns Prefix, Document Date or Document Revision
+PASS | Section key creation explicitly disables inheritance
+PASS | Managed publishing has no sibling fallback
+PASS | Headings and pictures excluded from requirement and matrix records
+PASS | Installed trigger body equals the readable open-check file
+PASS | Original bytes preserved: TPL_GTD_Publisher.docx
+PASS | Original bytes preserved: GTD_Build_Document.ps1
+PASS | Encoding-independent ASCII DXL source: GTD_Setup_Module.dxl
+PASS | Encoding-independent ASCII DXL source: GTD_Publish.dxl
+PASS | Encoding-independent ASCII DXL source: GTD_Requirement_Review_Control.dxl
+
+34 static contract checks passed. DOORS compilation and execution were not performed.

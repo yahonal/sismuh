@@ -1,0 +1,179 @@
+{
+  "snapshot_id": "GTD-HANDOFF-2026-09-13-a3cc85b1e006",
+  "date": "2026-09-13",
+  "candidate_digest": "a3cc85b1e006753d74b2687b404b86fb95a7e672215ffb4c7313ba57389513e4",
+  "status": "REVIEW_CANDIDATE_NOT_RUNTIME_VALIDATED",
+  "files": [
+    {
+      "path": "PROJECT_FILES/GTD/GUNCEL/GTD_Setup_Module.dxl",
+      "sha256": "8db1c858798ccbd26f61f5937e41ef5ee5976eb8609a84bc1158b55ed927165d",
+      "bytes": 37268,
+      "original_name": null,
+      "original_sha256": null,
+      "status": "NEW",
+      "byte_identical_to_original": null
+    },
+    {
+      "path": "PROJECT_FILES/GTD/GUNCEL/GTD_Publish.dxl",
+      "sha256": "ae9ede7a815a42475ae0856e4c4039d62e07ccf312d04ddbb2516c895f2e01c8",
+      "bytes": 39967,
+      "original_name": "GTD_Publish.dxl",
+      "original_sha256": "0d0d34a01c8c97f1aa0c6ddc3141cabc1c4eaee640578870bb9ec58cb066ef88",
+      "status": "MODIFIED",
+      "byte_identical_to_original": false
+    },
+    {
+      "path": "PROJECT_FILES/GTD/GUNCEL/GTD_Requirement_Review_Control.dxl",
+      "sha256": "016bd67910b1398ecebe1b091f292e6c4325785c3441fbb060c7640642d44a11",
+      "bytes": 21182,
+      "original_name": "GTD_Requirement_Review_Control.dxl",
+      "original_sha256": "aa602aa725bc48797718ffa07fc60e72e7e62279aecab8fc340d4ecdfa07dc00",
+      "status": "MODIFIED",
+      "byte_identical_to_original": false
+    },
+    {
+      "path": "PROJECT_FILES/GTD/GUNCEL/GTD_Module_Info.dxl",
+      "sha256": "10437d6ec52bcb11e7d9ed5cd6f2929052e6d47037554f4fcf61bfe8febd8d1b",
+      "bytes": 8742,
+      "original_name": "GTD_Module_Info(1).dxl",
+      "original_sha256": "aee7c8d27fae9ec7d0d3a8408a219c9a0fa10a770546ae0f6e59d1f3d6599cbe",
+      "status": "COMMENT_AND_NAME",
+      "byte_identical_to_original": false
+    },
+    {
+      "path": "PROJECT_FILES/GTD/GUNCEL/GTD_Open_Check.dxl",
+      "sha256": "7e14ae469db219e069b4137457c9fe90937065226caf6f1db076d79f4d4d5cf4",
+      "bytes": 3672,
+      "original_name": "GTD_Open_Check(1).dxl",
+      "original_sha256": "167d39312c3883c1dc60200c528f6ee894484757553afa26722f811de1c1e8b4",
+      "status": "COMMENT_AND_NAME",
+      "byte_identical_to_original": false
+    },
+    {
+      "path": "PROJECT_FILES/GTD/GUNCEL/GTD_Install_Open_Trigger.dxl",
+      "sha256": "bcd18eba4113efbfcc10f0af2366c6883b8c813b073141ca4e5724df1bc58f61",
+      "bytes": 9039,
+      "original_name": "GTD_Install_Open_Trigger(1).dxl",
+      "original_sha256": "42d5a183660639eea38e2603e52f6f3be9a8d9cddc44b76883a80d3cfcdbceb6",
+      "status": "EMBEDDED_BODY_AND_NAME",
+      "byte_identical_to_original": false
+    },
+    {
+      "path": "PROJECT_FILES/GTD/GUNCEL/GTD_Remove_Open_Trigger.dxl",
+      "sha256": "65bd19a1ee873ac50898515a1f1e75f88e3930fb4c5ad2a3d34d22aa2d0b4f26",
+      "bytes": 634,
+      "original_name": "GTD_Remove_Open_Trigger(1).dxl",
+      "original_sha256": "65bd19a1ee873ac50898515a1f1e75f88e3930fb4c5ad2a3d34d22aa2d0b4f26",
+      "status": "RENAME_ONLY",
+      "byte_identical_to_original": true
+    },
+    {
+      "path": "PROJECT_FILES/GTD/GUNCEL/GTD_Build_Document.ps1",
+      "sha256": "271ac27d3057aa00941496b14014204491b3cc0b67c26958ad682c7f8a613372",
+      "bytes": 43918,
+      "original_name": "GTD_Build_Document.ps1",
+      "original_sha256": "271ac27d3057aa00941496b14014204491b3cc0b67c26958ad682c7f8a613372",
+      "status": "UNCHANGED",
+      "byte_identical_to_original": true
+    },
+    {
+      "path": "PROJECT_FILES/GTD/GUNCEL/TPL_GTD_Publisher.docx",
+      "sha256": "1e2857f51b35ca0a84c4ccde6cfe2be3152cf0fae07638666b2506dfb7665d2c",
+      "bytes": 418716,
+      "original_name": "TPL_GTD_Publisher.docx",
+      "original_sha256": "1e2857f51b35ca0a84c4ccde6cfe2be3152cf0fae07638666b2506dfb7665d2c",
+      "status": "UNCHANGED",
+      "byte_identical_to_original": true
+    },
+    {
+      "path": "PROJECT_FILES/GTD/ORIJINAL_DOSYALAR/GTD_Build_Document.ps1",
+      "sha256": "271ac27d3057aa00941496b14014204491b3cc0b67c26958ad682c7f8a613372",
+      "bytes": 43918,
+      "status": "COPIED_WITHOUT_CHANGE"
+    },
+    {
+      "path": "PROJECT_FILES/GTD/ORIJINAL_DOSYALAR/GTD_Install_Open_Trigger(1).dxl",
+      "sha256": "42d5a183660639eea38e2603e52f6f3be9a8d9cddc44b76883a80d3cfcdbceb6",
+      "bytes": 9045,
+      "status": "COPIED_WITHOUT_CHANGE"
+    },
+    {
+      "path": "PROJECT_FILES/GTD/ORIJINAL_DOSYALAR/GTD_Module_Info(1).dxl",
+      "sha256": "aee7c8d27fae9ec7d0d3a8408a219c9a0fa10a770546ae0f6e59d1f3d6599cbe",
+      "bytes": 8750,
+      "status": "COPIED_WITHOUT_CHANGE"
+    },
+    {
+      "path": "PROJECT_FILES/GTD/ORIJINAL_DOSYALAR/GTD_Open_Check(1).dxl",
+      "sha256": "167d39312c3883c1dc60200c528f6ee894484757553afa26722f811de1c1e8b4",
+      "bytes": 3678,
+      "status": "COPIED_WITHOUT_CHANGE"
+    },
+    {
+      "path": "PROJECT_FILES/GTD/ORIJINAL_DOSYALAR/GTD_Publish.dxl",
+      "sha256": "0d0d34a01c8c97f1aa0c6ddc3141cabc1c4eaee640578870bb9ec58cb066ef88",
+      "bytes": 31745,
+      "status": "COPIED_WITHOUT_CHANGE"
+    },
+    {
+      "path": "PROJECT_FILES/GTD/ORIJINAL_DOSYALAR/GTD_Remove_Open_Trigger(1).dxl",
+      "sha256": "65bd19a1ee873ac50898515a1f1e75f88e3930fb4c5ad2a3d34d22aa2d0b4f26",
+      "bytes": 634,
+      "status": "COPIED_WITHOUT_CHANGE"
+    },
+    {
+      "path": "PROJECT_FILES/GTD/ORIJINAL_DOSYALAR/GTD_Requirement_Review_Control.dxl",
+      "sha256": "aa602aa725bc48797718ffa07fc60e72e7e62279aecab8fc340d4ecdfa07dc00",
+      "bytes": 13149,
+      "status": "COPIED_WITHOUT_CHANGE"
+    },
+    {
+      "path": "PROJECT_FILES/GTD/ORIJINAL_DOSYALAR/GTD_Setup_Requirement_Source_Attributes.dxl",
+      "sha256": "0109d5be70542704fe51536743458928a8884b077423c75871303fd8ac1ecd56",
+      "bytes": 3064,
+      "status": "COPIED_WITHOUT_CHANGE"
+    },
+    {
+      "path": "PROJECT_FILES/GTD/ORIJINAL_DOSYALAR/TPL_GTD_Publisher.docx",
+      "sha256": "1e2857f51b35ca0a84c4ccde6cfe2be3152cf0fae07638666b2506dfb7665d2c",
+      "bytes": 418716,
+      "status": "COPIED_WITHOUT_CHANGE"
+    },
+    {
+      "path": "PROJECT_FILES/GTD/BAKIM/STATIK_KONTROL_SONUCU.txt",
+      "sha256": "200df3b5e40ed5ac8b0ac54735db6c5e17942a9fe38eb244aaefda1dfe9f9d91",
+      "bytes": 2127,
+      "status": "COPIED_WITHOUT_CHANGE"
+    },
+    {
+      "path": "PROJECT_FILES/GTD/BAKIM/build_package.py",
+      "sha256": "2a871e532e2f879cff40e1436495ca8cb79b06684a464e9296a9bcd96086ac92",
+      "bytes": 15464,
+      "status": "COPIED_WITHOUT_CHANGE"
+    },
+    {
+      "path": "PROJECT_FILES/GTD/BAKIM/section_manifest.json",
+      "sha256": "ee6aa97643d365b94ac068b5a5a970e764c4093d863ce7da49ecdcc7d2187313",
+      "bytes": 1804,
+      "status": "COPIED_WITHOUT_CHANGE"
+    },
+    {
+      "path": "PROJECT_FILES/GTD/BAKIM/section_model.dxl",
+      "sha256": "776fceee54a62ef524d6a6c75d0f84cb498ef5e16242d13894a5c1f20691014f",
+      "bytes": 13334,
+      "status": "COPIED_WITHOUT_CHANGE"
+    },
+    {
+      "path": "PROJECT_FILES/GTD/BAKIM/setup_body.dxl",
+      "sha256": "0c63c2a518cead17baa33e80d435c7e22888355879830074184ccd941fd21774",
+      "bytes": 23445,
+      "status": "COPIED_WITHOUT_CHANGE"
+    },
+    {
+      "path": "PROJECT_FILES/GTD/BAKIM/verify_package.py",
+      "sha256": "5e96d3147ccc1f3a56a334fa6f6031f51591588d139c42fc5bdb3ba6a270cb3c",
+      "bytes": 7371,
+      "status": "COPIED_WITHOUT_CHANGE"
+    }
+  ]
+}

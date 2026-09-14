@@ -1,0 +1,292 @@
+// ============================================================
+// GTD_Module_Info.dxl
+// DOORS Classic 9.6.1.x
+//
+// GTD module metadata entry form.
+// Required:
+//   System Name
+//   Prefix (built-in DOORS module Prefix)
+//   Document Number
+//   Document Revision
+//   Document Date
+//   Project Name
+//   Project Number
+//   Department
+//   Classification
+//
+// Optional:
+//   Work Package
+//   SDVIL Number
+//
+// Assumes the GTD master/setup has already created the module attributes.
+// ============================================================
+
+pragma runLim, 0
+
+Module gtdInfoModule = current
+
+if (null gtdInfoModule) {
+    ack "Acik bir formal module bulunamadi."
+    halt
+}
+
+if (baseline(gtdInfoModule)) {
+    ack "Baseline uzerinde module bilgileri degistirilemez."
+    halt
+}
+
+if (!isEdit(gtdInfoModule)) {
+    ack "Module bilgilerini kaydetmek icin module'u Exclusive Edit modunda acin."
+    halt
+}
+
+// ------------------------------------------------------------
+// Required schema check
+// ------------------------------------------------------------
+string gtdRequiredAttrs[] = {
+    "System Name",
+    "Document Number",
+    "Document Revision",
+    "Document Date",
+    "Project Name",
+    "Project Number",
+    "Department",
+    "Work Package",
+    "SDVIL Number",
+    "Classification"
+}
+
+int gtdAttrIndex
+Buffer gtdMissingSchema = create
+
+for (gtdAttrIndex = 0; gtdAttrIndex < 10; gtdAttrIndex++) {
+    AttrDef gtdAd = find(gtdInfoModule, gtdRequiredAttrs[gtdAttrIndex])
+
+    if (null gtdAd || !gtdAd.module) {
+        if (length(stringOf(gtdMissingSchema)) > 0)
+            gtdMissingSchema += "\n"
+
+        gtdMissingSchema += gtdRequiredAttrs[gtdAttrIndex]
+    }
+}
+
+if (length(stringOf(gtdMissingSchema)) > 0) {
+    string gtdSchemaText = stringOf(gtdMissingSchema)
+    delete(gtdMissingSchema)
+
+    ack "GTD module semasi eksik.\n\nEksik Module Attribute:\n" gtdSchemaText
+    halt
+}
+
+delete(gtdMissingSchema)
+
+// ------------------------------------------------------------
+// Helpers
+// ------------------------------------------------------------
+string gtdTrim(string s)
+{
+    int n = length(s)
+    int first = 0
+    int last = n - 1
+
+    while (first < n) {
+        string c = s[first:first]
+        if (c == " " || c == "\t" || c == "\r" || c == "\n")
+            first++
+        else
+            break
+    }
+
+    while (last >= first) {
+        string c = s[last:last]
+        if (c == " " || c == "\t" || c == "\r" || c == "\n")
+            last--
+        else
+            break
+    }
+
+    if (last < first)
+        return ""
+
+    return s[first:last]
+}
+
+bool gtdValidPrefix(string s)
+{
+    s = gtdTrim(s)
+
+    if (s == "")
+        return false
+
+    string allowed = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_-"
+
+    int i
+    int j
+
+    for (i = 0; i < length(s); i++) {
+        string c = s[i:i]
+        bool ok = false
+
+        for (j = 0; j < length(allowed); j++) {
+            if (c == allowed[j:j]) {
+                ok = true
+                break
+            }
+        }
+
+        if (!ok)
+            return false
+    }
+
+    return true
+}
+
+// ------------------------------------------------------------
+// Current values
+// ------------------------------------------------------------
+string gtdSystemName       = gtdInfoModule."System Name" ""
+string gtdPrefix           = gtdInfoModule."Prefix" ""
+string gtdDocumentNumber   = gtdInfoModule."Document Number" ""
+string gtdDocumentRevision = gtdInfoModule."Document Revision" ""
+string gtdProjectName      = gtdInfoModule."Project Name" ""
+string gtdProjectNumber    = gtdInfoModule."Project Number" ""
+string gtdDepartment       = gtdInfoModule."Department" ""
+string gtdWorkPackage      = gtdInfoModule."Work Package" ""
+string gtdSDVILNumber      = gtdInfoModule."SDVIL Number" ""
+string gtdClassification   = gtdInfoModule."Classification" ""
+
+Date gtdDocumentDate = gtdInfoModule."Document Date"
+
+if (null gtdDocumentDate)
+    gtdDocumentDate = dateOnly(today)
+
+// ------------------------------------------------------------
+// Dialog globals
+// ------------------------------------------------------------
+DB gtdInfoDb = create("GTD Module Bilgileri", styleCentered | styleStandard)
+
+DBE gtdSystemNameField       = field(gtdInfoDb, "System Name *:",       gtdSystemName,       45, false)
+DBE gtdPrefixField           = field(gtdInfoDb, "DOORS Prefix *:",      gtdPrefix,           25, false)
+DBE gtdDocumentNumberField   = field(gtdInfoDb, "Document Number *:",   gtdDocumentNumber,   35, false)
+DBE gtdDocumentRevisionField = field(gtdInfoDb, "Document Revision *:", gtdDocumentRevision, 15, false)
+
+label(gtdInfoDb, "Document Date *:")
+beside gtdInfoDb
+DBE gtdDocumentDateField = date(gtdInfoDb, 18, dateOnly(gtdDocumentDate), true)
+left gtdInfoDb
+
+DBE gtdProjectNameField   = field(gtdInfoDb, "Project Name *:",   gtdProjectName,   45, false)
+DBE gtdProjectNumberField = field(gtdInfoDb, "Project Number *:", gtdProjectNumber, 30, false)
+DBE gtdDepartmentField    = field(gtdInfoDb, "Department *:",     gtdDepartment,    40, false)
+DBE gtdWorkPackageField   = field(gtdInfoDb, "Work Package:",     gtdWorkPackage,   30, false)
+DBE gtdSDVILNumberField   = field(gtdInfoDb, "SDVIL Number:",     gtdSDVILNumber,   30, false)
+
+string gtdClassificationChoices[] = {
+    "TASNİF DIŞI",
+    "HİZMETE ÖZEL",
+    "GİZLİ",
+    "ÇOK GİZLİ"
+}
+
+int gtdClassificationIndex = 0
+
+if (gtdClassification == "HİZMETE ÖZEL") gtdClassificationIndex = 1
+else if (gtdClassification == "GİZLİ") gtdClassificationIndex = 2
+else if (gtdClassification == "ÇOK GİZLİ") gtdClassificationIndex = 3
+
+DBE gtdClassificationChoice = choice(
+    gtdInfoDb,
+    "Classification *:",
+    gtdClassificationChoices,
+    4,
+    gtdClassificationIndex,
+    25,
+    false
+)
+
+// ------------------------------------------------------------
+// Save / cancel callbacks
+// ------------------------------------------------------------
+void gtdSaveInfo(DB db)
+{
+    string systemName       = gtdTrim(get(gtdSystemNameField))
+    string modulePrefix     = gtdTrim(get(gtdPrefixField))
+    string documentNumber   = gtdTrim(get(gtdDocumentNumberField))
+    string documentRevision = gtdTrim(get(gtdDocumentRevisionField))
+    string projectName      = gtdTrim(get(gtdProjectNameField))
+    string projectNumber    = gtdTrim(get(gtdProjectNumberField))
+    string department       = gtdTrim(get(gtdDepartmentField))
+    string workPackage      = gtdTrim(get(gtdWorkPackageField))
+    string sdvilNumber      = gtdTrim(get(gtdSDVILNumberField))
+
+    Date documentDate = dateOnly(getDate(gtdDocumentDateField))
+
+    int classificationIndex = get(gtdClassificationChoice)
+    string classification = ""
+
+    if (classificationIndex >= 0 && classificationIndex < 4)
+        classification = gtdClassificationChoices[classificationIndex]
+
+    Buffer missing = create
+
+    if (systemName == "")       missing += "System Name\n"
+    if (modulePrefix == "")     missing += "DOORS Prefix\n"
+    if (documentNumber == "")   missing += "Document Number\n"
+    if (documentRevision == "") missing += "Document Revision\n"
+    if (null documentDate)      missing += "Document Date\n"
+    if (projectName == "")      missing += "Project Name\n"
+    if (projectNumber == "")    missing += "Project Number\n"
+    if (department == "")       missing += "Department\n"
+    if (classification == "")   missing += "Classification\n"
+
+    string missingText = stringOf(missing)
+
+    if (missingText != "") {
+        delete(missing)
+        warningBox "Zorunlu alanlar eksik:\n\n" missingText
+        return
+    }
+
+    delete(missing)
+
+    if (!gtdValidPrefix(modulePrefix)) {
+        warningBox "DOORS Prefix gecersiz.\n\nYalnizca A-Z, a-z, 0-9, _ ve - kullanin."
+        return
+    }
+
+    gtdInfoModule."System Name"       = systemName
+    gtdInfoModule."Prefix"            = modulePrefix
+    gtdInfoModule."Document Number"   = documentNumber
+    gtdInfoModule."Document Revision" = documentRevision
+    gtdInfoModule."Document Date"     = documentDate
+    gtdInfoModule."Project Name"      = projectName
+    gtdInfoModule."Project Number"    = projectNumber
+    gtdInfoModule."Department"        = department
+    gtdInfoModule."Work Package"      = workPackage
+    gtdInfoModule."SDVIL Number"      = sdvilNumber
+    gtdInfoModule."Classification"    = classification
+
+    noError()
+    save(gtdInfoModule)
+    string saveError = lastError()
+
+    if (saveError != "") {
+        warningBox "Module kaydedilemedi:\n\n" saveError
+        return
+    }
+
+    release db
+}
+
+void gtdCancelInfo(DB db)
+{
+    release db
+}
+
+ok(gtdInfoDb, "Kaydet", gtdSaveInfo)
+close(gtdInfoDb, true, gtdCancelInfo)
+
+realize gtdInfoDb
+minimumSize(gtdInfoDb, 520, 430)
+block gtdInfoDb
+destroy gtdInfoDb

@@ -1,0 +1,126 @@
+{
+  "snapshot_id": "GTD-HANDOFF-2026-09-13-a3cc85b1e006",
+  "review_full_sources": [
+    "PROJECT_FILES/GTD/GUNCEL/GTD_Setup_Module.dxl",
+    "PROJECT_FILES/GTD/GUNCEL/GTD_Requirement_Review_Control.dxl",
+    "PROJECT_FILES/GTD/GUNCEL/GTD_Publish.dxl",
+    "PROJECT_FILES/GTD/GUNCEL/GTD_Build_Document.ps1",
+    "PROJECT_FILES/GTD/GUNCEL/GTD_Module_Info.dxl",
+    "PROJECT_FILES/GTD/GUNCEL/GTD_Open_Check.dxl",
+    "PROJECT_FILES/GTD/GUNCEL/GTD_Install_Open_Trigger.dxl",
+    "PROJECT_FILES/GTD/GUNCEL/GTD_Remove_Open_Trigger.dxl",
+    "PROJECT_FILES/GTD/BAKIM/build_package.py",
+    "PROJECT_FILES/GTD/BAKIM/setup_body.dxl",
+    "PROJECT_FILES/GTD/BAKIM/verify_package.py",
+    "PROJECT_FILES/GTD/ORIJINAL_DOSYALAR/GTD_Setup_Requirement_Source_Attributes.dxl"
+  ],
+  "research_code_excerpts": [
+    {
+      "name": "GTD_Setup_Module.dxl",
+      "start_line": 9,
+      "count": 22
+    },
+    {
+      "name": "GTD_Setup_Module.dxl",
+      "start_line": 335,
+      "count": 58
+    },
+    {
+      "name": "GTD_Setup_Module.dxl",
+      "start_line": 503,
+      "count": 132
+    },
+    {
+      "name": "GTD_Setup_Module.dxl",
+      "start_line": 756,
+      "count": 76
+    },
+    {
+      "name": "GTD_Setup_Module.dxl",
+      "start_line": 833,
+      "count": 128
+    },
+    {
+      "name": "GTD_Requirement_Review_Control.dxl",
+      "start_line": 441,
+      "count": 21
+    },
+    {
+      "name": "GTD_Requirement_Review_Control.dxl",
+      "start_line": 526,
+      "count": 60
+    },
+    {
+      "name": "GTD_Publish.dxl",
+      "start_line": 50,
+      "count": 34
+    },
+    {
+      "name": "GTD_Publish.dxl",
+      "start_line": 554,
+      "count": 67
+    },
+    {
+      "name": "GTD_Publish.dxl",
+      "start_line": 906,
+      "count": 100
+    },
+    {
+      "name": "GTD_Publish.dxl",
+      "start_line": 1006,
+      "count": 42
+    },
+    {
+      "name": "GTD_Build_Document.ps1",
+      "start_line": 74,
+      "count": 15
+    },
+    {
+      "name": "GTD_Build_Document.ps1",
+      "start_line": 269,
+      "count": 60
+    },
+    {
+      "name": "GTD_Build_Document.ps1",
+      "start_line": 848,
+      "count": 16
+    },
+    {
+      "name": "GTD_Build_Document.ps1",
+      "start_line": 1086,
+      "count": 40
+    },
+    {
+      "name": "GTD_Module_Info.dxl",
+      "start_line": 147,
+      "count": 20
+    },
+    {
+      "name": "GTD_Module_Info.dxl",
+      "start_line": 210,
+      "count": 71
+    },
+    {
+      "name": "GTD_Install_Open_Trigger.dxl",
+      "start_line": 18,
+      "count": 25
+    },
+    {
+      "name": "GTD_Install_Open_Trigger.dxl",
+      "start_line": 79,
+      "count": 22
+    }
+  ],
+  "shared_documents": [
+    "00_MASTER_CONTEXT.md",
+    "01_DECISIONS.md",
+    "02_ARCHITECTURE_AND_WORKFLOW.md",
+    "03_REQUIREMENT_RULES.md",
+    "04_RELEASE_BASELINE_CHANGE_WORKFLOW.md",
+    "05_OPEN_ITEMS.md",
+    "06_FILE_INVENTORY.md",
+    "07_VALIDATION_AND_ACCEPTANCE.md"
+  ],
+  "acceptance_tests": 26,
+  "source_files_copied": 26
+}

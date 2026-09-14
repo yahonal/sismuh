@@ -1,0 +1,142 @@
+[
+  [
+    "ROOT_GENEL",
+    "GENEL",
+    -1
+  ],
+  [
+    "AMAC",
+    "Amaç",
+    0
+  ],
+  [
+    "KAPSAM",
+    "Kapsam",
+    0
+  ],
+  [
+    "PROJE_TANITIMI",
+    "Proje Tanıtımı",
+    0
+  ],
+  [
+    "SISTEM_GENEL",
+    "Sisteme Genel Bakış",
+    3
+  ],
+  [
+    "URUN_GENEL",
+    "Ürüne Genel Bakış",
+    3
+  ],
+  [
+    "GROUP_KISALTMALAR_TANIMLAR",
+    "Kısaltmalar/Tanımlar",
+    0
+  ],
+  [
+    "KISALTMALAR",
+    "Kısaltmalar",
+    6
+  ],
+  [
+    "TANIMLAR",
+    "Tanımlar",
+    6
+  ],
+  [
+    "UYGULANABILIR_DOKUMANLAR",
+    "Uygulanabilir Dokümanlar",
+    0
+  ],
+  [
+    "STANDARTLAR",
+    "Standartlar",
+    9
+  ],
+  [
+    "DIGER_DOKUMANLAR",
+    "Diğer Dokümanlar",
+    9
+  ],
+  [
+    "ROOT_SISTEM_TANIMLAMASI",
+    "SİSTEMİN TANIMLAMASI",
+    -1
+  ],
+  [
+    "DURUM_MODLAR",
+    "Durum ve Modlar",
+    12
+  ],
+  [
+    "OMUR_DONGUSU",
+    "Ömür Döngüsü",
+    12
+  ],
+  [
+    "SINIRLAMALAR",
+    "Sınırlamalar",
+    12
+  ],
+  [
+    "ROOT_GEREKSINIMLER",
+    "GEREKSİNİMLER",
+    -1
+  ],
+  [
+    "REQ_ISLEVSEL",
+    "İşlevsel Gereksinimler",
+    16
+  ],
+  [
+    "REQ_PERFORMANS",
+    "Performans Gereksinimleri",
+    16
+  ],
+  [
+    "REQ_FIZIKSEL",
+    "Fiziksel Gereksinimler",
+    16
+  ],
+  [
+    "REQ_ARAYUZ",
+    "Arayüz Gereksinimleri",
+    16
+  ],
+  [
+    "REQ_CEVRESEL",
+    "Çevresel Gereksinimler",
+    16
+  ],
+  [
+    "REQ_EMNIYET",
+    "Emniyet Gereksinimleri",
+    16
+  ],
+  [
+    "REQ_ELD",
+    "Entegre Lojistik Destek Gereksinimleri",
+    16
+  ],
+  [
+    "REQ_GUV_GIZ",
+    "Güvenlik ve Gizlilik Gereksinimleri",
+    16
+  ],
+  [
+    "REQ_ERGONOMI",
+    "Ergonomi Gereksinimleri",
+    16
+  ],
+  [
+    "REQ_MARKALAMA",
+    "Markalama ve Etiketleme Gereksinimleri",
+    16
+  ],
+  [
+    "REQ_BILGISAYAR",
+    "Bilgisayar Kaynak Gereksinimleri",
+    16
+  ]
+]

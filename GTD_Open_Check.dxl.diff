@@ -1,0 +1,13 @@
+--- ORIJINAL_DOSYALAR/GTD_Open_Check(1).dxl
++++ GUNCEL/GTD_Open_Check.dxl
+@@ -64,9 +64,9 @@
+ 
+     string templateVersion = gtdModule."GTD Template Version" ""
+     string formPath = gtdModule."GTD Form Path" ""
+ 
+-    // Master/template marker is not configured: silently ignore.
++    // GTD setup marker is not configured: silently ignore.
+     if (templateVersion == "" || formPath == "")
+         return
+ 
+     Buffer missing = create

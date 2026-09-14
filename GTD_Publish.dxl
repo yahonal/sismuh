@@ -1,0 +1,856 @@
+// ============================================================
+// GTD Publisher - DOORS to Word
+// DOORS -> simple text data -> PowerShell -> DOCX
+// ============================================================
+
+pragma runLim, 0
+
+Module m = current
+
+if (null m) {
+    ack "Acik bir formal module bulunamadi."
+    halt
+}
+
+AttrDef adTpl = find(m, "GTD Word Template Path")
+if (null adTpl) {
+    ack "GTD Word Template Path Module Attribute tanimli degil."
+    halt
+}
+
+string templatePath = m."GTD Word Template Path" ""
+
+AttrDef adScript = find(m, "GTD Publisher Script Path")
+if (null adScript) {
+    ack "GTD Publisher Script Path Module Attribute tanimli degil."
+    halt
+}
+
+string scriptPath = m."GTD Publisher Script Path" ""
+
+if (templatePath == "") {
+    ack "GTD Word Template Path degeri bos."
+    halt
+}
+
+if (scriptPath == "") {
+    ack "GTD Publisher Script Path degeri bos."
+    halt
+}
+
+if (!fileExists_(scriptPath)) {
+    ack "PowerShell publisher bulunamadi:\n" scriptPath
+    halt
+}
+
+// ------------------------------------------------------------
+// Make one safe data field:
+//   |, tab, CR and LF -> space
+// ------------------------------------------------------------
+string safeField(string s)
+{
+    Buffer b = create
+    int i
+    int n = length(s)
+
+    for (i = 0; i < n; i++) {
+        string ch = s[i:i]
+
+        if (ch == "|" || ch == "\n" || ch == "\r" || ch == "\t")
+            b += " "
+        else
+            b += ch
+    }
+
+    string r = stringOf(b)
+    delete(b)
+    return r
+}
+
+// Required: full path of the link module used for derived-from traceability.
+// Link direction is current requirement -> upper/source requirement.
+AttrDef adTraceLinkModule = find(m, "GTD Trace Link Module")
+string traceLinkModulePath = ""
+if (!null adTraceLinkModule) traceLinkModulePath = m."GTD Trace Link Module" ""
+if (traceLinkModulePath == "" || traceLinkModulePath == "*") {
+    ack "GTD Trace Link Module: set this module String attribute to the full path of your upper-requirement link module."
+    halt
+}
+if (traceLinkModulePath[0:0] != "/") {
+    ack "GTD Trace Link Module must be a full DOORS path beginning with /."
+    halt
+}
+AttrDef adTraceNote = find(m, "Traceability Note")
+
+// Requirement source classification. These are object attributes.
+AttrDef adSourceType = find(m, "Requirement Source Type")
+AttrDef adSourceReference = find(m, "Requirement Source Reference")
+if (null adSourceType || null adSourceReference) {
+    ack "Requirement source attributes are missing.\nRun GTD_Setup_Requirement_Source_Attributes.dxl once while the module is open in Exclusive Edit mode."
+    halt
+}
+
+string systemName       = m."System Name" ""
+string documentNumber   = m."Document Number" ""
+string documentRevision = m."Document Revision" ""
+string projectName      = m."Project Name" ""
+string projectNumber    = m."Project Number" ""
+string department       = m."Department" ""
+string workPackage      = m."Work Package" ""
+string sdvilNumber      = m."SDVIL Number" ""
+string classification   = m."Classification" ""
+
+Date dv = m."Document Date"
+string documentDate = ""
+
+if (!null dv)
+    documentDate = dv ""
+
+string tmpBase = tempFileName()
+string dataPath = tmpBase ".txt"
+
+string safeDoc = goodFileName(documentNumber "_Rev" documentRevision)
+if (safeDoc == "")
+    safeDoc = "GTD_Output"
+
+string outputName = safeDoc ".docx"
+
+// ------------------------------------------------------------
+// Write simple text data
+// ------------------------------------------------------------
+Stream out = write(dataPath)
+
+if (null out) {
+    ack "Gecici GTD veri dosyasi olusturulamadi:\n" dataPath
+    halt
+}
+
+string sfSystemName       = safeField(systemName)
+string sfDocumentNumber   = safeField(documentNumber)
+string sfDocumentRevision = safeField(documentRevision)
+string sfDocumentDate     = safeField(documentDate)
+string sfProjectName      = safeField(projectName)
+string sfProjectNumber    = safeField(projectNumber)
+string sfDepartment       = safeField(department)
+string sfWorkPackage      = safeField(workPackage)
+string sfSDVILNumber      = safeField(sdvilNumber)
+string sfClassification   = safeField(classification)
+
+out << "M|SystemName|"       << sfSystemName       << "\n"
+out << "M|DocumentNumber|"   << sfDocumentNumber   << "\n"
+out << "M|DocumentRevision|" << sfDocumentRevision << "\n"
+out << "M|DocumentDate|"     << sfDocumentDate     << "\n"
+out << "M|ProjectName|"      << sfProjectName      << "\n"
+out << "M|ProjectNumber|"    << sfProjectNumber    << "\n"
+out << "M|Department|"       << sfDepartment       << "\n"
+out << "M|WorkPackage|"      << sfWorkPackage      << "\n"
+out << "M|SDVILNumber|"      << sfSDVILNumber      << "\n"
+out << "M|Classification|"   << sfClassification   << "\n"
+
+
+// ------------------------------------------------------------
+// Export narrative sections + native DOORS tables.
+//
+// O|SectionKey|TEXT/REQ/IMAGE/TABLE_START/CELL/TABLE_END|...
+// D|...   diagnostic records for the publisher log
+//
+// ------------------------------------------------------------
+// Robust heading resolution
+//
+// - Ignores spaces/tabs/CR/LF in heading text.
+// - Accepts manually numbered headings such as "1.3 Proje Tanitimi"
+//   by checking the END of the normalized heading.
+// - Parent lookup starts at parent(x), never at x itself.
+// ------------------------------------------------------------
+// All source characters are ASCII. Construct runtime bytes explicitly.
+string headingBytes(int first, int second, int third)
+{
+    Buffer b = create
+    char c1 = charOf(first)
+    b += c1
+    if (second >= 0) {
+        char c2 = charOf(second)
+        b += c2
+    }
+    if (third >= 0) {
+        char c3 = charOf(third)
+        b += c3
+    }
+    string result = stringOf(b)
+    delete(b)
+    return result
+}
+
+// Replace complete strings: works without assuming one byte per Turkish letter.
+string replaceHeadingToken(string s, string token, string replacement)
+{
+    Buffer b = create
+    int i = 0
+    int n = length(s)
+    int t = length(token)
+    while (i < n) {
+        bool matched = false
+        if (i + t <= n) {
+            string part = s[i:(i + t - 1)]
+            if (part == token) matched = true
+        }
+        if (matched) {
+            b += replacement
+            i = i + t
+        }
+        else {
+            b += s[i:i]
+            i++
+        }
+    }
+    string result = stringOf(b)
+    delete(b)
+    return result
+}
+
+string compactHeading(string s)
+{
+    string token = ""
+    // Decode complete UTF-8 sequences before single-byte Windows-1254.
+    token = headingBytes(195, 135, -1)
+    s = replaceHeadingToken(s, token, "c")
+    token = headingBytes(195, 167, -1)
+    s = replaceHeadingToken(s, token, "c")
+    token = headingBytes(196, 158, -1)
+    s = replaceHeadingToken(s, token, "g")
+    token = headingBytes(196, 159, -1)
+    s = replaceHeadingToken(s, token, "g")
+    token = headingBytes(196, 176, -1)
+    s = replaceHeadingToken(s, token, "i")
+    token = headingBytes(196, 177, -1)
+    s = replaceHeadingToken(s, token, "i")
+    token = headingBytes(195, 150, -1)
+    s = replaceHeadingToken(s, token, "o")
+    token = headingBytes(195, 182, -1)
+    s = replaceHeadingToken(s, token, "o")
+    token = headingBytes(197, 158, -1)
+    s = replaceHeadingToken(s, token, "s")
+    token = headingBytes(197, 159, -1)
+    s = replaceHeadingToken(s, token, "s")
+    token = headingBytes(195, 156, -1)
+    s = replaceHeadingToken(s, token, "u")
+    token = headingBytes(195, 188, -1)
+    s = replaceHeadingToken(s, token, "u")
+    // Windows Turkish bytes (also covers common Latin-1 letters).
+    token = headingBytes(199, -1, -1)
+    s = replaceHeadingToken(s, token, "c")
+    token = headingBytes(231, -1, -1)
+    s = replaceHeadingToken(s, token, "c")
+    token = headingBytes(208, -1, -1)
+    s = replaceHeadingToken(s, token, "g")
+    token = headingBytes(240, -1, -1)
+    s = replaceHeadingToken(s, token, "g")
+    token = headingBytes(221, -1, -1)
+    s = replaceHeadingToken(s, token, "i")
+    token = headingBytes(253, -1, -1)
+    s = replaceHeadingToken(s, token, "i")
+    token = headingBytes(214, -1, -1)
+    s = replaceHeadingToken(s, token, "o")
+    token = headingBytes(246, -1, -1)
+    s = replaceHeadingToken(s, token, "o")
+    token = headingBytes(222, -1, -1)
+    s = replaceHeadingToken(s, token, "s")
+    token = headingBytes(254, -1, -1)
+    s = replaceHeadingToken(s, token, "s")
+    token = headingBytes(220, -1, -1)
+    s = replaceHeadingToken(s, token, "u")
+    token = headingBytes(252, -1, -1)
+    s = replaceHeadingToken(s, token, "u")
+    token = headingBytes(194, 160, -1)
+    s = replaceHeadingToken(s, token, "")
+    token = headingBytes(226, 128, 175)
+    s = replaceHeadingToken(s, token, "")
+    token = headingBytes(226, 128, 139)
+    s = replaceHeadingToken(s, token, "")
+    token = headingBytes(160, -1, -1)
+    s = replaceHeadingToken(s, token, "")
+    string upperChars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+    string lowerChars = "abcdefghijklmnopqrstuvwxyz"
+    Buffer b = create
+    int i
+    int j
+    int n = length(s)
+    for (i = 0; i < n; i++) {
+        string ch = s[i:i]
+        for (j = 0; j < 26; j++) {
+            if (ch == upperChars[j:j]) {
+                ch = lowerChars[j:j]
+                break
+            }
+        }
+        if (ch != " " && ch != "\t" && ch != "\r" && ch != "\n" && ch != ":")
+            b += ch
+    }
+    string result = stringOf(b)
+    delete(b)
+    return result
+}
+
+bool headingEndsWith(string h, string suffix)
+{
+    string c = compactHeading(h)
+    string s = compactHeading(suffix)
+    int lc = length(c)
+    int ls = length(s)
+    if (ls == 0 || lc < ls) return false
+    string tail = c[(lc - ls):(lc - 1)]
+    if (tail != s) return false
+    // Only a manual numeric prefix may precede a known heading.
+    // An arbitrary heading ending in a known name must not steal its section.
+    int i
+    for (i = 0; i < lc - ls; i++) {
+        string ch = c[i:i]
+        if (ch != "0" && ch != "1" && ch != "2" && ch != "3" && ch != "4" && ch != "5" && ch != "6" && ch != "7" && ch != "8" && ch != "9" && ch != "." && ch != ")" && ch != "(" && ch != "-")
+            return false
+    }
+    return true
+}
+
+string sectionKeyForHeading(string h)
+{
+    if (headingEndsWith(h, "amac")) return "AMAC"
+    if (headingEndsWith(h, "kapsam")) return "KAPSAM"
+    if (headingEndsWith(h, "projetanimi")) return "PROJE_TANITIMI"
+    if (headingEndsWith(h, "projetanitimi")) return "PROJE_TANITIMI"
+    if (headingEndsWith(h, "sistemegenelbakis")) return "SISTEM_GENEL"
+    if (headingEndsWith(h, "urunegenelbakis")) return "URUN_GENEL"
+    if (headingEndsWith(h, "kisaltmalar")) return "KISALTMALAR"
+    if (headingEndsWith(h, "tanimlar")) return "TANIMLAR"
+    if (headingEndsWith(h, "uygulanabilirdokumanlar")) return "UYGULANABILIR_DOKUMANLAR"
+    if (headingEndsWith(h, "standartlar")) return "STANDARTLAR"
+    if (headingEndsWith(h, "digerdokumanlar")) return "DIGER_DOKUMANLAR"
+    if (headingEndsWith(h, "durumvemodlar")) return "DURUM_MODLAR"
+    if (headingEndsWith(h, "omurdongusu")) return "OMUR_DONGUSU"
+    if (headingEndsWith(h, "sinirlamalar")) return "SINIRLAMALAR"
+
+    if (headingEndsWith(h, "islevselgereksinimleri")) return "REQ_ISLEVSEL"
+    if (headingEndsWith(h, "islevselgereksinimler")) return "REQ_ISLEVSEL"
+    if (headingEndsWith(h, "performansgereksinimleri")) return "REQ_PERFORMANS"
+    if (headingEndsWith(h, "fizikselgereksinimler")) return "REQ_FIZIKSEL"
+    if (headingEndsWith(h, "arayuzgereksinimleri")) return "REQ_ARAYUZ"
+    if (headingEndsWith(h, "cevreselgereksinimler")) return "REQ_CEVRESEL"
+    if (headingEndsWith(h, "emniyetgereksinimleri")) return "REQ_EMNIYET"
+    if (headingEndsWith(h, "entegrelojistikdestekgereksinimleri")) return "REQ_ELD"
+    if (headingEndsWith(h, "guvenlikvegizlilikgereksinimleri")) return "REQ_GUV_GIZ"
+    if (headingEndsWith(h, "ergonomigereksinimleri")) return "REQ_ERGONOMI"
+    if (headingEndsWith(h, "markalamaveetiketlemegereksinimleri")) return "REQ_MARKALAMA"
+    if (headingEndsWith(h, "bilgisayarkaynakgereksinimleri")) return "REQ_BILGISAYAR"
+
+    return ""
+}
+
+bool isContentSection(string k)
+{
+    if (k == "AMAC") return true
+    if (k == "KAPSAM") return true
+    if (k == "PROJE_TANITIMI") return true
+    if (k == "SISTEM_GENEL") return true
+    if (k == "URUN_GENEL") return true
+    if (k == "KISALTMALAR") return true
+    if (k == "TANIMLAR") return true
+    if (k == "UYGULANABILIR_DOKUMANLAR") return true
+    if (k == "STANDARTLAR") return true
+    if (k == "DIGER_DOKUMANLAR") return true
+    if (k == "DURUM_MODLAR") return true
+    if (k == "OMUR_DONGUSU") return true
+    if (k == "SINIRLAMALAR") return true
+
+    if (k == "REQ_ISLEVSEL") return true
+    if (k == "REQ_PERFORMANS") return true
+    if (k == "REQ_FIZIKSEL") return true
+    if (k == "REQ_ARAYUZ") return true
+    if (k == "REQ_CEVRESEL") return true
+    if (k == "REQ_EMNIYET") return true
+    if (k == "REQ_ELD") return true
+    if (k == "REQ_GUV_GIZ") return true
+    if (k == "REQ_ERGONOMI") return true
+    if (k == "REQ_MARKALAMA") return true
+    if (k == "REQ_BILGISAYAR") return true
+
+    return false
+}
+
+bool isRequirementSection(string k)
+{
+    if (k == "REQ_ISLEVSEL") return true
+    if (k == "REQ_PERFORMANS") return true
+    if (k == "REQ_FIZIKSEL") return true
+    if (k == "REQ_ARAYUZ") return true
+    if (k == "REQ_CEVRESEL") return true
+    if (k == "REQ_EMNIYET") return true
+    if (k == "REQ_ELD") return true
+    if (k == "REQ_GUV_GIZ") return true
+    if (k == "REQ_ERGONOMI") return true
+    if (k == "REQ_MARKALAMA") return true
+    if (k == "REQ_BILGISAYAR") return true
+    return false
+}
+
+// IMPORTANT: this starts at parent(x), not x.
+// It therefore means "which recognized section contains x?"
+string sectionKeyFromParents(Object x)
+{
+    Object p = parent(x)
+
+    while (!null p) {
+        if (!table(p) && !row(p) && !cell(p)) {
+            string h = p."Object Heading" ""
+            string k = sectionKeyForHeading(h)
+
+            if (k != "")
+                return k
+        }
+
+        p = parent(p)
+    }
+
+    return ""
+}
+
+// Self-check both source encodings before processing module objects.
+string checkAnsi = "Ama" headingBytes(231, -1, -1)
+string checkUtf8 = "Ama" headingBytes(195, 167, -1)
+string normAnsi = compactHeading(checkAnsi)
+string normUtf8 = compactHeading(checkUtf8)
+string keyAnsi = sectionKeyForHeading(checkAnsi)
+string keyUtf8 = sectionKeyForHeading(checkUtf8)
+if (normAnsi != "amac" || normUtf8 != "amac" || keyAnsi != "AMAC" || keyUtf8 != "AMAC") {
+    close(out)
+    ack "Heading normalization self-check failed. Export stopped."
+    halt
+}
+
+bool oldTableContents = tableContents(m)
+tableContents(true)
+
+Object so
+Object tr
+Object tc
+
+// Sequential fallback is used only when the object is a sibling rather than
+// a child of the section heading.
+//
+// activeSectionLevel prevents stale sections from leaking into the next
+// sibling heading. If a new heading appears at the same or higher level,
+// the previous section context is closed immediately.
+string activeSection = ""
+int activeSectionLevel = 999
+
+for so in entire m do {
+
+    if (!isDeleted(so)) {
+
+        string ownHeading = ""
+        string ownSection = ""
+        int ownLevel = 999
+
+        if (!table(so) && !row(so) && !cell(so)) {
+
+            ownHeading = so."Object Heading" ""
+            ownLevel = level(so)
+
+            if (ownHeading != "")
+                ownSection = sectionKeyForHeading(ownHeading)
+
+            // A recognized heading ALWAYS wins and immediately becomes active.
+            if (ownSection != "") {
+                activeSection = ownSection
+                activeSectionLevel = ownLevel
+            }
+            else if (ownHeading != "") {
+                // An unrelated heading at the same/higher hierarchy level closes
+                // the previous sibling-section context.
+                if (activeSection != "" && ownLevel <= activeSectionLevel) {
+                    activeSection = ""
+                    activeSectionLevel = 999
+                }
+            }
+        }
+
+        // ---------------- Narrative sections ----------------
+        if (!table(so) && !row(so) && !cell(so)) {
+
+            string narrativeSection = ""
+
+            string directSection = sectionKeyForHeading(ownHeading)
+
+            if (directSection != "")
+                narrativeSection = directSection
+            else {
+                narrativeSection = sectionKeyFromParents(so)
+
+                if (narrativeSection == "")
+                    narrativeSection = activeSection
+            }
+
+            if (narrativeSection == "") {
+                string unmappedText = so."Object Text" ""
+                if (unmappedText != "") {
+                    string unmappedId = safeField(identifier(so))
+                    string unmappedType = safeField(so."Requirement Type" "")
+                    out << "D|CONTENT_SKIPPED|" << unmappedId << "|NO_SECTION|RequirementType=" << unmappedType << "\n"
+                }
+            }
+
+            if (narrativeSection != "" && isContentSection(narrativeSection)) {
+
+                string sectionText = so."Object Text" ""
+                string sectionReqType = so."Requirement Type" ""
+
+                // In requirement sections, real requirements are emitted by
+                // the REQ branch below. Any other Object Text is a normal TEXT
+                // event and remains in sequence.
+                bool emitAsText = true
+
+                if (isRequirementSection(narrativeSection) && sectionReqType != "")
+                    emitAsText = false
+
+                if (sectionText != "" && emitAsText && isRequirementSection(narrativeSection)) {
+                    string noTypeId = safeField(identifier(so))
+                    out << "D|REQ_AS_TEXT|" << noTypeId << "|" << narrativeSection << "|EMPTY_REQUIREMENT_TYPE\n"
+                }
+
+                if (sectionText != "" && emitAsText) {
+                    string sfSectionText = safeField(sectionText)
+
+                    // Ordered content record used by the publisher.
+                    out << "O|" << narrativeSection << "|TEXT|" << sfSectionText << "\n"
+                }
+            }
+        }
+
+        // ---------------- Ordered requirement content ----------------
+        // O|Section|REQ|Id|Text|VerificationMethod|VerificationReference
+        //
+        // This record is emitted in the SAME "entire m" traversal as tables,
+        // so the physical DOORS order is preserved:
+        // SYS-40 -> table -> SYS-41 remains SYS-40 -> table -> SYS-41.
+        if (!table(so) && !row(so) && !cell(so)) {
+
+            string orderedSection = ""
+
+            string directReqSection = sectionKeyForHeading(ownHeading)
+
+            if (directReqSection != "")
+                orderedSection = directReqSection
+            else {
+                orderedSection = sectionKeyFromParents(so)
+
+                if (orderedSection == "")
+                    orderedSection = activeSection
+            }
+
+            if (orderedSection != "" && isRequirementSection(orderedSection)) {
+
+                string orderedReqType = so."Requirement Type" ""
+                string orderedReqText = so."Object Text" ""
+
+                if (orderedReqType != "" && orderedReqText != "") {
+
+                    string orderedReqId = identifier(so)
+                    string orderedVerMethod = so."Verification Method" ""
+                    string orderedVerRef = so."Verification Reference" ""
+
+                    string sfOrderedReqId = safeField(orderedReqId)
+                    string sfOrderedReqText = safeField(orderedReqText)
+                    string sfOrderedVerMethod = safeField(orderedVerMethod)
+                    string sfOrderedVerRef = safeField(orderedVerRef)
+
+                    out << "O|" << orderedSection << "|REQ|" << sfOrderedReqId << "|" << sfOrderedReqText << "|" << sfOrderedVerMethod << "|" << sfOrderedVerRef << "\n"
+                }
+            }
+        }
+
+        // ---------------- Native DOORS picture objects ----------------
+        // Picture objects remain siblings of requirements so requirements stay leaf objects.
+        // O|Section|IMAGE|ObjectId|PngPath|Width10pt|Height10pt|PictureName
+        if (!table(so) && !row(so) && !cell(so)) {
+
+            string pictureName = getPictName(so)
+
+            if (!null pictureName && pictureName != "") {
+
+                string pictureSection = sectionKeyForHeading(ownHeading)
+
+                if (pictureSection == "") {
+                    pictureSection = sectionKeyFromParents(so)
+
+                    if (pictureSection == "")
+                        pictureSection = activeSection
+                }
+
+                string sfPictureId = safeField(identifier(so))
+                string sfPictureName = safeField(pictureName)
+
+                if (pictureSection != "" && isContentSection(pictureSection)) {
+
+                    string pictureFileId = goodFileName(identifier(so))
+                    if (pictureFileId == "") pictureFileId = "picture"
+
+                    string picturePath = tmpBase "_IMG_" pictureFileId ".png"
+                    string exportError = exportPicture(so, picturePath, formatPNG)
+
+                    if (null exportError || exportError == "") {
+                        int llx = 0
+                        int lly = 0
+                        int urx = 0
+                        int ury = 0
+                        getPictBB(so, llx, lly, urx, ury)
+
+                        int pictureWidth10pt = urx - llx
+                        int pictureHeight10pt = ury - lly
+                        if (pictureWidth10pt < 0) pictureWidth10pt = 0 - pictureWidth10pt
+                        if (pictureHeight10pt < 0) pictureHeight10pt = 0 - pictureHeight10pt
+
+                        string sfPicturePath = safeField(picturePath)
+                        string sfPictureWidth = pictureWidth10pt ""
+                        string sfPictureHeight = pictureHeight10pt ""
+
+                        out << "O|" << pictureSection << "|IMAGE|" << sfPictureId << "|" << sfPicturePath << "|" << sfPictureWidth << "|" << sfPictureHeight << "|" << sfPictureName << "\n"
+                    }
+                    else {
+                        string sfPictureError = safeField(exportError)
+                        out << "D|IMAGE_EXPORT_ERROR|" << sfPictureId << "|" << pictureSection << "|" << sfPictureError << "\n"
+                    }
+                }
+                else {
+                    out << "D|IMAGE_SKIPPED|" << sfPictureId << "|NO_SECTION|" << sfPictureName << "\n"
+                }
+            }
+        }
+
+        // ---------------- Native DOORS tables ----------------
+        if (table(so)) {
+
+            string tableSection = sectionKeyFromParents(so)
+
+            // Table header can be a sibling immediately after a mapped heading.
+            if (tableSection == "")
+                tableSection = activeSection
+
+            string sfTableId = safeField(identifier(so))
+
+            // Accept a native DOORS table under ANY mapped content section.
+            if (tableSection != "" && isContentSection(tableSection)) {
+
+                int rowNo = 0
+                bool orderedContentTable = isContentSection(tableSection)
+
+                if (orderedContentTable) {
+                    out << "O|" << tableSection << "|TABLE_START|" << sfTableId << "\n"
+                }
+
+                for tr in table so do {
+
+                    rowNo++
+                    int colNo = 0
+
+                    for tc in row tr do {
+
+                        colNo++
+
+                        string cellText = tc."Object Text" ""
+
+                        if (cellText == "")
+                            cellText = tc."Object Heading" ""
+
+                        string sfCellText = safeField(cellText)
+                        string rowNoText = rowNo ""
+                        string colNoText = colNo ""
+
+                        // O CELL records preserve the exact table location
+                        // within ANY mapped 1.x / 2.x / 3.x section.
+                        if (orderedContentTable) {
+                            out << "O|" << tableSection << "|CELL|" << sfTableId << "|" << rowNoText << "|" << colNoText << "|" << sfCellText << "\n"
+                        }
+                    }
+                }
+
+                if (orderedContentTable) {
+                    out << "O|" << tableSection << "|TABLE_END|" << sfTableId << "\n"
+                }
+            }
+            else {
+                out << "D|TABLE_SKIPPED|" << sfTableId << "|NO_SECTION\n"
+            }
+        }
+    }
+}
+
+tableContents(oldTableContents)
+
+string sfTraceFilter = safeField(traceLinkModulePath)
+out << "D|TRACE_DIRECTION|OUTGOING|" << sfTraceFilter << "\n"
+
+int sourceValidationWarnings = 0
+
+Object o
+
+for o in entire m do {
+    if (!isDeleted(o) && !table(o) && !row(o) && !cell(o)) {
+    string reqType = o."Requirement Type" ""
+    string objText = o."Object Text" ""
+
+    if (reqType != "" && objText != "") {
+
+        string reqId = identifier(o)
+        string verMethod = o."Verification Method" ""
+        string verRef = o."Verification Reference" ""
+
+        string sfReqId      = safeField(reqId)
+        string sfReqType    = safeField(reqType)
+        string sfObjText    = safeField(objText)
+        string sfVerMethod  = safeField(verMethod)
+        string sfVerRef     = safeField(verRef)
+
+        out << "R|" << sfReqId << "|" << sfReqType << "|" << sfObjText << "|" << sfVerMethod << "|" << sfVerRef << "\n"
+
+        // Q = supplemental matrix fields. X = one outgoing source link per row.
+        // Q|ReqId|RelatedSystem|TraceNote|SourceType|SourceReference
+        string traceNote = ""
+        if (!null adTraceNote) traceNote = o."Traceability Note" ""
+        string sourceType = o."Requirement Source Type" ""
+        string sourceReference = o."Requirement Source Reference" ""
+        string sfTraceNote = safeField(traceNote)
+        string sfSourceType = safeField(sourceType)
+        string sfSourceReference = safeField(sourceReference)
+        out << "Q|" << sfReqId << "|" << sfSystemName << "|" << sfTraceNote << "|" << sfSourceType << "|" << sfSourceReference << "\n"
+
+        int matchedTraceLinks = 0
+        Link traceLink
+        for traceLink in all(o->"*") do {
+            Module traceLinkModule = module(traceLink)
+            string actualLinkPath = fullName(traceLinkModule)
+            string sfActualLinkPath = safeField(actualLinkPath)
+            if (actualLinkPath == traceLinkModulePath) {
+                matchedTraceLinks++
+                string traceSourceId = ""
+                string traceSourceModule = ""
+                string traceStatus = "UNREADABLE"
+                ModuleVersion traceTargetVersion = targetVersion(traceLink)
+                if (!null traceTargetVersion) {
+                    ModName_ sourceModuleName = module(traceTargetVersion)
+                    if (!null sourceModuleName) {
+                        traceSourceModule = fullName(sourceModuleName)
+                        if (!isDeleted(sourceModuleName)) {
+                            Object sourceObject = target(traceLink)
+                            if (null sourceObject) {
+                                noError()
+                                load(traceTargetVersion, false)
+                                string loadError = lastError()
+                                if (!null loadError && loadError != "") {
+                                    string sfLoadError = safeField(loadError)
+                                    out << "D|TRACE_LOAD_ERROR|" << sfReqId << "|" << sfLoadError << "\n"
+                                }
+                                sourceObject = target(traceLink)
+                            }
+                            if (!null sourceObject) {
+                                if (!isDeleted(sourceObject)) {
+                                    traceSourceId = identifier(sourceObject)
+                                    traceStatus = "RESOLVED"
+                                }
+                                else traceStatus = "DELETED"
+                            }
+                        }
+                        else traceStatus = "DELETED"
+                    }
+                }
+                string sfTraceSourceId = safeField(traceSourceId)
+                string sfTraceSourceModule = safeField(traceSourceModule)
+                out << "X|" << sfReqId << "|" << sfTraceSourceId << "|" << sfTraceSourceModule << "|" << sfActualLinkPath << "|" << traceStatus << "\n"
+            }
+            else {
+            }
+        }
+        if (matchedTraceLinks == 0) {
+            out << "X|" << sfReqId << "||||NONE\n"
+        }
+
+        // Source-definition validation. Warnings do not block publishing yet.
+        if (sourceType == "") {
+            sourceValidationWarnings++
+            out << "D|SOURCE_WARNING|" << sfReqId << "|SOURCE_TYPE_EMPTY\n"
+        }
+        else if (sourceType == "Higher-Level Requirement") {
+            if (matchedTraceLinks == 0) {
+                sourceValidationWarnings++
+                out << "D|SOURCE_WARNING|" << sfReqId << "|HIGHER_LEVEL_WITHOUT_LINK\n"
+            }
+        }
+        else if (sourceType == "Derived") {
+            if (matchedTraceLinks > 0) {
+                sourceValidationWarnings++
+                out << "D|SOURCE_WARNING|" << sfReqId << "|DERIVED_HAS_UPPER_SOURCE_LINK\n"
+            }
+        }
+        else if (sourceType == "Standard / Regulation" ||
+                 sourceType == "Interface" ||
+                 sourceType == "Safety Analysis" ||
+                 sourceType == "Other") {
+            if (sourceReference == "") {
+                sourceValidationWarnings++
+                out << "D|SOURCE_WARNING|" << sfReqId << "|SOURCE_REFERENCE_EMPTY|" << sfSourceType << "\n"
+            }
+        }
+        else {
+            sourceValidationWarnings++
+            out << "D|SOURCE_WARNING|" << sfReqId << "|UNKNOWN_SOURCE_TYPE|" << sfSourceType << "\n"
+        }
+
+    }
+    }
+}
+
+string sourceWarningCountText = sourceValidationWarnings ""
+out << "D|SOURCE_VALIDATION_SUMMARY|WARNINGS|" << sourceWarningCountText << "\n"
+
+close(out)
+
+// ------------------------------------------------------------
+// Copy network files to local TEMP, then run locally.
+// ------------------------------------------------------------
+string batPath = tmpBase ".bat"
+string localScript = tmpBase "_GTD_Build_Document.ps1"
+string localTemplate = tmpBase "_TPL_GTD_Publisher.docx"
+
+Stream bat = write(batPath)
+
+if (null bat) {
+    ack "Gecici BAT dosyasi olusturulamadi."
+    halt
+}
+
+bat << "@echo off\r\n"
+bat << "setlocal\r\n"
+bat << "cd /d \"%TEMP%\"\r\n"
+
+bat << "copy /Y \"" scriptPath "\" \"" localScript "\" >nul\r\n"
+bat << "if errorlevel 1 (\r\n"
+bat << "  echo PowerShell dosyasi TEMP'e kopyalanamadi.\r\n"
+bat << "  pause\r\n"
+bat << "  exit /b 1\r\n"
+bat << ")\r\n"
+
+bat << "copy /Y \"" templatePath "\" \"" localTemplate "\" >nul\r\n"
+bat << "if errorlevel 1 (\r\n"
+bat << "  echo Word template TEMP'e kopyalanamadi.\r\n"
+bat << "  pause\r\n"
+bat << "  exit /b 1\r\n"
+bat << ")\r\n"
+
+bat << "powershell.exe -NoProfile -ExecutionPolicy Bypass -File \"" localScript "\" -DataPath \"" dataPath "\" -TemplatePath \"" localTemplate "\" -OutputName \"" outputName "\"\r\n"
+bat << "set ERR=%ERRORLEVEL%\r\n"
+bat << "del /Q \"" localScript "\" >nul 2>nul\r\n"
+bat << "del /Q \"" localTemplate "\" >nul 2>nul\r\n"
+bat << "exit /b %ERR%\r\n"
+
+close(bat)
+
+system("cmd.exe /c \"" batPath "\"")
+
+infoBox "GTD yayin komutu tamamlandi.\n\nBasariliysa cikti Masaustunde secili gosterilecek.\nBasarisizsa Masaustundeki GTD_Publish_Log.txt otomatik acilacak."

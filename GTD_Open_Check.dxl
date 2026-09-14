@@ -1,0 +1,150 @@
+// ============================================================
+// GTD_Open_Check.dxl
+// Body used by persistent trigger: GTD_Module_Open_Check
+// Scope: current project -> all formal modules
+// Event: post open
+// Priority: 10
+//
+// A module is treated as a GTD module only when it has:
+//   GTD Template Version
+//   GTD Form Path
+//
+// Required values checked:
+//   Prefix
+//   System Name
+//   Document Number
+//   Document Revision
+//   Document Date
+//   Project Name
+//   Project Number
+//   Department
+//   Classification
+//
+// Optional:
+//   Work Package
+//   SDVIL Number
+//
+// When required data is missing, reads GTD Form Path once and eval_()s
+// GTD_Module_Info.dxl once.
+// ============================================================
+
+pragma runLim, 0
+
+void gtdAppendMissing(Buffer b, string fieldName)
+{
+    if (length(stringOf(b)) > 0)
+        b += "\n"
+
+    b += fieldName
+}
+
+void gtdRunOpenCheck()
+{
+    Trigger gtdTrigger = current()
+
+    // For a post-open module trigger, this obtains the opened module.
+    // The 0 variant also allows correct baseline detection.
+    Module gtdModule = module(gtdTrigger, 0)
+
+    if (null gtdModule)
+        return
+
+    if (baseline(gtdModule))
+        return
+
+    AttrDef adVersion = find(gtdModule, "GTD Template Version")
+    AttrDef adFormPath = find(gtdModule, "GTD Form Path")
+
+    // Not a GTD module: silently ignore.
+    if (null adVersion || null adFormPath)
+        return
+
+    if (!adVersion.module || !adFormPath.module)
+        return
+
+    string templateVersion = gtdModule."GTD Template Version" ""
+    string formPath = gtdModule."GTD Form Path" ""
+
+    // GTD setup marker is not configured: silently ignore.
+    if (templateVersion == "" || formPath == "")
+        return
+
+    Buffer missing = create
+
+    // Built-in module Prefix.
+    string modulePrefix = gtdModule."Prefix" ""
+
+    if (modulePrefix == "")
+        gtdAppendMissing(missing, "Prefix")
+
+    string requiredStringAttrs[] = {
+        "System Name",
+        "Document Number",
+        "Document Revision",
+        "Project Name",
+        "Project Number",
+        "Department",
+        "Classification"
+    }
+
+    int i
+
+    for (i = 0; i < 7; i++) {
+        string attrName = requiredStringAttrs[i]
+        AttrDef ad = find(gtdModule, attrName)
+
+        if (null ad || !ad.module) {
+            gtdAppendMissing(missing, attrName " [attribute missing]")
+        }
+        else {
+            string value = gtdModule.(attrName) ""
+
+            if (value == "")
+                gtdAppendMissing(missing, attrName)
+        }
+    }
+
+    AttrDef adDate = find(gtdModule, "Document Date")
+
+    if (null adDate || !adDate.module) {
+        gtdAppendMissing(missing, "Document Date [attribute missing]")
+    }
+    else {
+        Date documentDate = gtdModule."Document Date"
+
+        if (null documentDate)
+            gtdAppendMissing(missing, "Document Date")
+    }
+
+    string missingText = stringOf(missing)
+
+    if (missingText == "") {
+        delete(missing)
+        return
+    }
+
+    if (!fileExists_(formPath)) {
+        warningBox "GTD module bilgileri eksik fakat form dosyasi bulunamadi.\n\nGTD Form Path:\n" formPath "\n\nEksik alanlar:\n" missingText
+        delete(missing)
+        return
+    }
+
+    string formCode = readFile(formPath)
+
+    if (formCode == "") {
+        warningBox "GTD form dosyasi okunamadi veya bos:\n\n" formPath
+        delete(missing)
+        return
+    }
+
+    // Run the shared form exactly once.
+    string evalError = eval_(formCode)
+
+    if (evalError != "") {
+        warningBox "GTD_Module_Info.dxl calistirilirken hata olustu:\n\n" evalError
+    }
+
+    delete(missing)
+}
+
+gtdRunOpenCheck()

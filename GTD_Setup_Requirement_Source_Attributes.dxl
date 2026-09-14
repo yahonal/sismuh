@@ -1,0 +1,85 @@
+// ============================================================
+// GTD one-time setup - Requirement Source attributes
+// Run from the target formal module in Exclusive Edit mode.
+// ============================================================
+
+pragma runLim, 0
+
+Module m = current
+if (null m) {
+    ack "Acik bir formal module bulunamadi."
+    halt
+}
+
+if (!isEdit(m)) {
+    ack "Bu kurulum attribute type/definition olusturur.\nModulu Exclusive Edit modunda acip tekrar calistirin."
+    halt
+}
+
+string sourceTypeName = "GTD Requirement Source Type"
+string sourceAttrName = "Requirement Source Type"
+string sourceRefAttrName = "Requirement Source Reference"
+
+// ------------------------------------------------------------
+// 1) Enumerated attribute type
+// ------------------------------------------------------------
+AttrType atSource = find(m, sourceTypeName)
+if (null atSource) {
+    string enumNames[6] = {
+        "Higher-Level Requirement",
+        "Derived",
+        "Standard / Regulation",
+        "Interface",
+        "Safety Analysis",
+        "Other"
+    }
+    int enumValues[6] = {1, 2, 3, 4, 5, 6}
+    int enumColors[6] = {-1, -1, -1, -1, -1, -1}
+    string errType = ""
+
+    atSource = create(sourceTypeName, enumNames, enumValues, enumColors, errType)
+    if (null atSource || errType != "") {
+        ack "Requirement Source enumeration type olusturulamadi:\n" errType
+        halt
+    }
+}
+
+// ------------------------------------------------------------
+// 2) Object attribute using the enumeration type
+// ------------------------------------------------------------
+AttrDef adSource = find(m, sourceAttrName)
+if (null adSource) {
+    noError()
+    adSource = create object type sourceTypeName attribute sourceAttrName
+    string errSource = lastError()
+    if (null adSource || (!null errSource && errSource != "")) {
+        ack "Requirement Source Type attribute olusturulamadi:\n" errSource
+        halt
+    }
+}
+else if (!adSource.object) {
+    ack "Requirement Source Type mevcut fakat Object Attribute degil.\nLutfen attribute tanimini kontrol edin."
+    halt
+}
+
+// ------------------------------------------------------------
+// 3) Free-text reference for standards / ICD / safety analysis etc.
+// ------------------------------------------------------------
+AttrDef adRef = find(m, sourceRefAttrName)
+if (null adRef) {
+    noError()
+    adRef = create object type "String" attribute sourceRefAttrName
+    string errRef = lastError()
+    if (null adRef || (!null errRef && errRef != "")) {
+        ack "Requirement Source Reference attribute olusturulamadi:\n" errRef
+        halt
+    }
+}
+else if (!adRef.object) {
+    ack "Requirement Source Reference mevcut fakat Object Attribute degil.\nLutfen attribute tanimini kontrol edin."
+    halt
+}
+
+save(m)
+
+ack "GTD requirement source alanlari hazir.\n\nRequirement Source Type:\n- Higher-Level Requirement\n- Derived\n- Standard / Regulation\n- Interface\n- Safety Analysis\n- Other\n\nRequirement Source Reference: String\n\nBu iki attribute'u module view'a kolon olarak ekleyebilirsiniz."

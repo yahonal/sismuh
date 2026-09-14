@@ -1,0 +1,996 @@
+// GTD_Setup_Module.dxl - DOORS Classic 9.6.1.x
+// Run in the visible target formal module, in Exclusive Edit mode.
+// Creates missing schema, headings and views. Reuses existing heading objects.
+// Never moves/deletes an existing object, changes an enum, or creates a baseline.
+// GTD Template Version is retained as a compatibility marker for the open trigger.
+
+pragma runLim, 0
+
+Module gtdSetupModule = current
+if (null gtdSetupModule) {
+    ack "Acik bir formal module bulunamadi."
+    halt
+}
+if (baseline(gtdSetupModule) || !isEdit(gtdSetupModule)) {
+    ack "Setup icin guncel modulu Exclusive Edit modunda acin."
+    halt
+}
+
+// BEGIN GTD SECTION MODEL - keep identical in setup, publisher and Control.
+string headingBytes(int first, int second, int third)
+{
+    Buffer b = create
+    char c1 = charOf(first)
+    b += c1
+    if (second >= 0) {
+        char c2 = charOf(second)
+        b += c2
+    }
+    if (third >= 0) {
+        char c3 = charOf(third)
+        b += c3
+    }
+    string result = stringOf(b)
+    delete(b)
+    return result
+}
+
+// Replace complete strings: works without assuming one byte per Turkish letter.
+string replaceHeadingToken(string s, string token, string replacement)
+{
+    Buffer b = create
+    int i = 0
+    int n = length(s)
+    int t = length(token)
+    while (i < n) {
+        bool matched = false
+        if (i + t <= n) {
+            string part = s[i:(i + t - 1)]
+            if (part == token) matched = true
+        }
+        if (matched) {
+            b += replacement
+            i = i + t
+        }
+        else {
+            b += s[i:i]
+            i++
+        }
+    }
+    string result = stringOf(b)
+    delete(b)
+    return result
+}
+
+string compactHeading(string s)
+{
+    string token = ""
+    // Decode complete UTF-8 sequences before single-byte Windows-1254.
+    token = headingBytes(195, 135, -1)
+    s = replaceHeadingToken(s, token, "c")
+    token = headingBytes(195, 167, -1)
+    s = replaceHeadingToken(s, token, "c")
+    token = headingBytes(196, 158, -1)
+    s = replaceHeadingToken(s, token, "g")
+    token = headingBytes(196, 159, -1)
+    s = replaceHeadingToken(s, token, "g")
+    token = headingBytes(196, 176, -1)
+    s = replaceHeadingToken(s, token, "i")
+    token = headingBytes(196, 177, -1)
+    s = replaceHeadingToken(s, token, "i")
+    token = headingBytes(195, 150, -1)
+    s = replaceHeadingToken(s, token, "o")
+    token = headingBytes(195, 182, -1)
+    s = replaceHeadingToken(s, token, "o")
+    token = headingBytes(197, 158, -1)
+    s = replaceHeadingToken(s, token, "s")
+    token = headingBytes(197, 159, -1)
+    s = replaceHeadingToken(s, token, "s")
+    token = headingBytes(195, 156, -1)
+    s = replaceHeadingToken(s, token, "u")
+    token = headingBytes(195, 188, -1)
+    s = replaceHeadingToken(s, token, "u")
+    // Windows Turkish bytes (also covers common Latin-1 letters).
+    token = headingBytes(199, -1, -1)
+    s = replaceHeadingToken(s, token, "c")
+    token = headingBytes(231, -1, -1)
+    s = replaceHeadingToken(s, token, "c")
+    token = headingBytes(208, -1, -1)
+    s = replaceHeadingToken(s, token, "g")
+    token = headingBytes(240, -1, -1)
+    s = replaceHeadingToken(s, token, "g")
+    token = headingBytes(221, -1, -1)
+    s = replaceHeadingToken(s, token, "i")
+    token = headingBytes(253, -1, -1)
+    s = replaceHeadingToken(s, token, "i")
+    token = headingBytes(214, -1, -1)
+    s = replaceHeadingToken(s, token, "o")
+    token = headingBytes(246, -1, -1)
+    s = replaceHeadingToken(s, token, "o")
+    token = headingBytes(222, -1, -1)
+    s = replaceHeadingToken(s, token, "s")
+    token = headingBytes(254, -1, -1)
+    s = replaceHeadingToken(s, token, "s")
+    token = headingBytes(220, -1, -1)
+    s = replaceHeadingToken(s, token, "u")
+    token = headingBytes(252, -1, -1)
+    s = replaceHeadingToken(s, token, "u")
+    token = headingBytes(194, 160, -1)
+    s = replaceHeadingToken(s, token, "")
+    token = headingBytes(226, 128, 175)
+    s = replaceHeadingToken(s, token, "")
+    token = headingBytes(226, 128, 139)
+    s = replaceHeadingToken(s, token, "")
+    token = headingBytes(160, -1, -1)
+    s = replaceHeadingToken(s, token, "")
+    string upperChars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+    string lowerChars = "abcdefghijklmnopqrstuvwxyz"
+    Buffer b = create
+    int i
+    int j
+    int n = length(s)
+    for (i = 0; i < n; i++) {
+        string ch = s[i:i]
+        for (j = 0; j < 26; j++) {
+            if (ch == upperChars[j:j]) {
+                ch = lowerChars[j:j]
+                break
+            }
+        }
+        if (ch != " " && ch != "\t" && ch != "\r" && ch != "\n" && ch != ":")
+            b += ch
+    }
+    string result = stringOf(b)
+    delete(b)
+    return result
+}
+
+bool headingEndsWith(string h, string suffix)
+{
+    string c = compactHeading(h)
+    string s = compactHeading(suffix)
+    int lc = length(c)
+    int ls = length(s)
+    if (ls == 0 || lc < ls) return false
+    string tail = c[(lc - ls):(lc - 1)]
+    if (tail != s) return false
+    // Only a manual numeric prefix may precede a known heading.
+    // An arbitrary heading ending in a known name must not steal its section.
+    int i
+    for (i = 0; i < lc - ls; i++) {
+        string ch = c[i:i]
+        if (ch != "0" && ch != "1" && ch != "2" && ch != "3" && ch != "4" && ch != "5" && ch != "6" && ch != "7" && ch != "8" && ch != "9" && ch != "." && ch != ")" && ch != "(" && ch != "-")
+            return false
+    }
+    return true
+}
+
+const int GTD_SECTION_COUNT = 28
+string gtdSectionKeys[] = {
+    "ROOT_GENEL",
+    "AMAC",
+    "KAPSAM",
+    "PROJE_TANITIMI",
+    "SISTEM_GENEL",
+    "URUN_GENEL",
+    "GROUP_KISALTMALAR_TANIMLAR",
+    "KISALTMALAR",
+    "TANIMLAR",
+    "UYGULANABILIR_DOKUMANLAR",
+    "STANDARTLAR",
+    "DIGER_DOKUMANLAR",
+    "ROOT_SISTEM_TANIMLAMASI",
+    "DURUM_MODLAR",
+    "OMUR_DONGUSU",
+    "SINIRLAMALAR",
+    "ROOT_GEREKSINIMLER",
+    "REQ_ISLEVSEL",
+    "REQ_PERFORMANS",
+    "REQ_FIZIKSEL",
+    "REQ_ARAYUZ",
+    "REQ_CEVRESEL",
+    "REQ_EMNIYET",
+    "REQ_ELD",
+    "REQ_GUV_GIZ",
+    "REQ_ERGONOMI",
+    "REQ_MARKALAMA",
+    "REQ_BILGISAYAR"
+}
+string gtdSectionHeadings[] = {
+    "GENEL",
+    "Ama" headingBytes(195, 167, -1),
+    "Kapsam",
+    "Proje Tan" headingBytes(196, 177, -1) "t" headingBytes(196, 177, -1) "m" headingBytes(196, 177, -1),
+    "Sisteme Genel Bak" headingBytes(196, 177, -1) headingBytes(197, 159, -1),
+    headingBytes(195, 156, -1) "r" headingBytes(195, 188, -1) "ne Genel Bak" headingBytes(196, 177, -1) headingBytes(197, 159, -1),
+    "K" headingBytes(196, 177, -1) "saltmalar/Tan" headingBytes(196, 177, -1) "mlar",
+    "K" headingBytes(196, 177, -1) "saltmalar",
+    "Tan" headingBytes(196, 177, -1) "mlar",
+    "Uygulanabilir Dok" headingBytes(195, 188, -1) "manlar",
+    "Standartlar",
+    "Di" headingBytes(196, 159, -1) "er Dok" headingBytes(195, 188, -1) "manlar",
+    "S" headingBytes(196, 176, -1) "STEM" headingBytes(196, 176, -1) "N TANIMLAMASI",
+    "Durum ve Modlar",
+    headingBytes(195, 150, -1) "m" headingBytes(195, 188, -1) "r D" headingBytes(195, 182, -1) "ng" headingBytes(195, 188, -1) "s" headingBytes(195, 188, -1),
+    "S" headingBytes(196, 177, -1) "n" headingBytes(196, 177, -1) "rlamalar",
+    "GEREKS" headingBytes(196, 176, -1) "N" headingBytes(196, 176, -1) "MLER",
+    headingBytes(196, 176, -1) headingBytes(197, 159, -1) "levsel Gereksinimler",
+    "Performans Gereksinimleri",
+    "Fiziksel Gereksinimler",
+    "Aray" headingBytes(195, 188, -1) "z Gereksinimleri",
+    headingBytes(195, 135, -1) "evresel Gereksinimler",
+    "Emniyet Gereksinimleri",
+    "Entegre Lojistik Destek Gereksinimleri",
+    "G" headingBytes(195, 188, -1) "venlik ve Gizlilik Gereksinimleri",
+    "Ergonomi Gereksinimleri",
+    "Markalama ve Etiketleme Gereksinimleri",
+    "Bilgisayar Kaynak Gereksinimleri"
+}
+int gtdSectionParents[] = {-1, 0, 0, 0, 3, 3, 0, 6, 6, 0, 9, 9, -1, 12, 12, 12, -1, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16}
+string sectionKeyForHeading(string h)
+{
+    if (headingEndsWith(h, "amac")) return "AMAC"
+    if (headingEndsWith(h, "kapsam")) return "KAPSAM"
+    if (headingEndsWith(h, "projetanimi")) return "PROJE_TANITIMI"
+    if (headingEndsWith(h, "projetanitimi")) return "PROJE_TANITIMI"
+    if (headingEndsWith(h, "sistemegenelbakis")) return "SISTEM_GENEL"
+    if (headingEndsWith(h, "urunegenelbakis")) return "URUN_GENEL"
+    if (headingEndsWith(h, "kisaltmalar")) return "KISALTMALAR"
+    if (headingEndsWith(h, "tanimlar")) return "TANIMLAR"
+    if (headingEndsWith(h, "uygulanabilirdokumanlar")) return "UYGULANABILIR_DOKUMANLAR"
+    if (headingEndsWith(h, "standartlar")) return "STANDARTLAR"
+    if (headingEndsWith(h, "digerdokumanlar")) return "DIGER_DOKUMANLAR"
+    if (headingEndsWith(h, "durumvemodlar")) return "DURUM_MODLAR"
+    if (headingEndsWith(h, "omurdongusu")) return "OMUR_DONGUSU"
+    if (headingEndsWith(h, "sinirlamalar")) return "SINIRLAMALAR"
+
+    if (headingEndsWith(h, "islevselgereksinimleri")) return "REQ_ISLEVSEL"
+    if (headingEndsWith(h, "islevselgereksinimler")) return "REQ_ISLEVSEL"
+    if (headingEndsWith(h, "performansgereksinimleri")) return "REQ_PERFORMANS"
+    if (headingEndsWith(h, "fizikselgereksinimler")) return "REQ_FIZIKSEL"
+    if (headingEndsWith(h, "arayuzgereksinimleri")) return "REQ_ARAYUZ"
+    if (headingEndsWith(h, "cevreselgereksinimler")) return "REQ_CEVRESEL"
+    if (headingEndsWith(h, "emniyetgereksinimleri")) return "REQ_EMNIYET"
+    if (headingEndsWith(h, "entegrelojistikdestekgereksinimleri")) return "REQ_ELD"
+    if (headingEndsWith(h, "guvenlikvegizlilikgereksinimleri")) return "REQ_GUV_GIZ"
+    if (headingEndsWith(h, "ergonomigereksinimleri")) return "REQ_ERGONOMI"
+    if (headingEndsWith(h, "markalamaveetiketlemegereksinimleri")) return "REQ_MARKALAMA"
+    if (headingEndsWith(h, "bilgisayarkaynakgereksinimleri")) return "REQ_BILGISAYAR"
+
+    if (headingEndsWith(h, "genel")) return "ROOT_GENEL"
+    if (headingEndsWith(h, "kisaltmalar/tanimlar")) return "GROUP_KISALTMALAR_TANIMLAR"
+    if (headingEndsWith(h, "kisaltmalarvetanimlar")) return "GROUP_KISALTMALAR_TANIMLAR"
+    if (headingEndsWith(h, "sistemintanimlamasi")) return "ROOT_SISTEM_TANIMLAMASI"
+    if (headingEndsWith(h, "sistemintanimi")) return "ROOT_SISTEM_TANIMLAMASI"
+    if (headingEndsWith(h, "gereksinimler")) return "ROOT_GEREKSINIMLER"
+    return ""
+}
+
+bool isContentSection(string k)
+{
+    if (k == "AMAC") return true
+    if (k == "KAPSAM") return true
+    if (k == "PROJE_TANITIMI") return true
+    if (k == "SISTEM_GENEL") return true
+    if (k == "URUN_GENEL") return true
+    if (k == "KISALTMALAR") return true
+    if (k == "TANIMLAR") return true
+    if (k == "UYGULANABILIR_DOKUMANLAR") return true
+    if (k == "STANDARTLAR") return true
+    if (k == "DIGER_DOKUMANLAR") return true
+    if (k == "DURUM_MODLAR") return true
+    if (k == "OMUR_DONGUSU") return true
+    if (k == "SINIRLAMALAR") return true
+
+    if (k == "REQ_ISLEVSEL") return true
+    if (k == "REQ_PERFORMANS") return true
+    if (k == "REQ_FIZIKSEL") return true
+    if (k == "REQ_ARAYUZ") return true
+    if (k == "REQ_CEVRESEL") return true
+    if (k == "REQ_EMNIYET") return true
+    if (k == "REQ_ELD") return true
+    if (k == "REQ_GUV_GIZ") return true
+    if (k == "REQ_ERGONOMI") return true
+    if (k == "REQ_MARKALAMA") return true
+    if (k == "REQ_BILGISAYAR") return true
+
+    return false
+}
+
+bool isRequirementSection(string k)
+{
+    if (k == "REQ_ISLEVSEL") return true
+    if (k == "REQ_PERFORMANS") return true
+    if (k == "REQ_FIZIKSEL") return true
+    if (k == "REQ_ARAYUZ") return true
+    if (k == "REQ_CEVRESEL") return true
+    if (k == "REQ_EMNIYET") return true
+    if (k == "REQ_ELD") return true
+    if (k == "REQ_GUV_GIZ") return true
+    if (k == "REQ_ERGONOMI") return true
+    if (k == "REQ_MARKALAMA") return true
+    if (k == "REQ_BILGISAYAR") return true
+    return false
+}
+
+
+int gtdSectionIndex(string key)
+{
+    int i
+    for (i = 0; i < GTD_SECTION_COUNT; i++)
+        if (gtdSectionKeys[i] == key) return i
+    return -1
+}
+
+bool gtdBlank(string s)
+{
+    int i
+    for (i = 0; i < length(s); i++) {
+        string c = s[i:i]
+        if (c != " " && c != "\t" && c != "\r" && c != "\n") return false
+    }
+    return true
+}
+
+string gtdStoredSectionKey(Object o)
+{
+    if (null o) return ""
+    Module om = module(o)
+    AttrDef ad = find(om, "GTD Section Key")
+    if (null ad || !ad.object) return ""
+    return o."GTD Section Key" ""
+}
+
+string sectionKeyForObject(Object o)
+{
+    if (null o || isDeleted(o)) return ""
+    if (table(o) || row(o) || cell(o)) return ""
+    if (!gtdBlank(getPictName(o))) return ""
+    string h = o."Object Heading" ""
+    if (gtdBlank(h)) return ""
+    string key = gtdStoredSectionKey(o)
+    // A nonempty unknown key must not fall back to the visible title.
+    if (!gtdBlank(key)) {
+        if (gtdSectionIndex(key) >= 0) return key
+        return ""
+    }
+    return sectionKeyForHeading(h)
+}
+
+string gtdSectionIdentityIssue(Object o)
+{
+    string stored = gtdStoredSectionKey(o)
+    if (gtdBlank(stored)) return ""
+    if (table(o) || row(o) || cell(o)) return "SECTION_KEY_ON_TABLE"
+    if (gtdSectionIndex(stored) < 0) return "UNKNOWN_SECTION_KEY"
+    string h = o."Object Heading" ""
+    if (gtdBlank(h)) return "SECTION_KEY_WITHOUT_HEADING"
+    string pict = getPictName(o)
+    if (!gtdBlank(pict)) return "SECTION_KEY_ON_PICTURE"
+    string titleKey = sectionKeyForHeading(h)
+    if (titleKey != "" && titleKey != stored) return "SECTION_KEY_TITLE_CONFLICT"
+    return ""
+}
+
+// Start at the parent: a section heading is not its own requirement.
+// A recognized container closes the search; do not inherit a stale section.
+string sectionKeyFromParents(Object x)
+{
+    Object p = parent(x)
+    while (!null p) {
+        string key = sectionKeyForObject(p)
+        if (key != "") {
+            if (isContentSection(key)) return key
+            return ""
+        }
+        p = parent(p)
+    }
+    return ""
+}
+// END GTD SECTION MODEL
+
+
+string gtdRequirementTypes[] = {
+    headingBytes(196, 176, -1) headingBytes(197, 159, -1) "levsel",
+    "Performans",
+    "Fiziksel",
+    "Aray" headingBytes(195, 188, -1) "z",
+    headingBytes(195, 135, -1) "evresel",
+    "Emniyet",
+    "Entegre Lojistik Destek",
+    "G" headingBytes(195, 188, -1) "venlik ve Gizlilik",
+    "Ergonomi",
+    "Markalama ve Etiketleme",
+    "Bilgisayar Kaynak"
+}
+string gtdVerificationMethods[] = {
+    "Analiz",
+    "G" headingBytes(195, 182, -1) "sterim",
+    "Muayene",
+    "Test",
+    "Uygunluk Belgesi"
+}
+
+string gtdSourceTypes[] = {
+    "Higher-Level Requirement", "Derived", "Standard / Regulation",
+    "Interface", "Safety Analysis", "Other"
+}
+string gtdModuleStrings[] = {
+    "System Name", "Document Number", "Document Revision", "Project Name",
+    "Project Number", "Department", "Work Package", "SDVIL Number",
+    "Classification", "GTD Template Version", "GTD Form Path",
+    "GTD Word Template Path", "GTD Publisher Script Path", "GTD Trace Link Module",
+    "GTD Tool Folder", "GTD Setup State"
+}
+string gtdObjectTexts[] = {
+    "Verification Reference", "Rationale", "Remarks", "Traceability Note"
+}
+
+string gtdLogPath = tempFileName() "_GTD_Setup_Log.txt"
+Stream gtdLogStream = write(gtdLogPath)
+if (null gtdLogStream) {
+    ack "Setup log dosyasi acilamadi. Degisiklik yapilmadi."
+    halt
+}
+int gtdCreatedAttrs = 0
+int gtdCreatedHeadings = 0
+int gtdReusedHeadings = 0
+int gtdBlockedHeadings = 0
+int gtdCreatedViews = 0
+int gtdUpdatedViews = 0
+int gtdSchemaErrors = 0
+int gtdReviewNeeded = 0
+bool gtdMutationStarted = false
+
+void gtdLog(string text)
+{
+    gtdLogStream << text << "\n"
+    print text "\n"
+}
+
+void gtdFail(string message)
+{
+    if (gtdMutationStarted) {
+        AttrDef stateDef = find(gtdSetupModule, "GTD Setup State")
+        if (!null stateDef && stateDef.module) {
+            noError()
+            gtdSetupModule."GTD Setup State" = "INCOMPLETE"
+            string stateErr = lastError()
+            if (!gtdBlank(stateErr)) gtdLog("STATE_UPDATE_FAILED | " stateErr)
+        }
+    }
+    gtdLog("STOP | " message)
+    close(gtdLogStream)
+    ack "GTD setup tamamlanamadi.\n" message "\n\nLog:\n" gtdLogPath
+    halt
+}
+
+string gtdReadModuleString(string name)
+{
+    AttrDef ad = find(gtdSetupModule, name)
+    if (null ad || !ad.module) return ""
+    return gtdSetupModule.(name) ""
+}
+
+string gtdTrim(string s)
+{
+    int a = 0
+    int z = length(s) - 1
+    while (a <= z && gtdBlank(s[a:a])) a++
+    while (z >= a && gtdBlank(s[z:z])) z--
+    if (z < a) return ""
+    return s[a:z]
+}
+
+string gtdFolderOf(string path)
+{
+    int i
+    for (i = length(path)-1; i >= 0; i--)
+        if (path[i:i] == "\\" || path[i:i] == "/") {
+            if (i == 0) return path[0:0]
+            return path[0:i-1]
+        }
+    return ""
+}
+
+bool gtdTextType(AttrType at)
+{
+    if (null at) return false
+    return at.type == attrString || at.type == attrText
+}
+
+// Only validation here. All schema conflicts are collected before any mutation.
+void gtdCheckAttribute(string name, bool moduleScope, string kind)
+{
+    AttrDef ad = find(gtdSetupModule, name)
+    if (null ad) return
+    bool valid = true
+    if (moduleScope && !ad.module) valid = false
+    if (!moduleScope && !ad.object) valid = false
+    AttrType at = ad.type
+    if (null at) valid = false
+    else {
+        if (kind == "Date" && at.type != attrDate) valid = false
+        if (kind == "Text" && !gtdTextType(at)) valid = false
+        if (kind == "Choice" && !gtdTextType(at) && at.type != attrEnumeration) valid = false
+        if (kind == "Key") {
+            if (at.type != attrString || ad.inherit || ad.dxl || ad.multi) valid = false
+        }
+    }
+    if (!valid) {
+        gtdSchemaErrors++
+        gtdLog("SCHEMA_CONFLICT | " name " | existing definition preserved")
+    }
+}
+
+bool gtdHasEnumLabel(AttrType at, string label, bool normalize)
+{
+    int i
+    for (i = 0; i < at.size; i++) {
+        string value = at.strings[i]
+        if (normalize) {
+            if (compactHeading(value) == compactHeading(label)) return true
+        }
+        else if (value == label) return true
+    }
+    return false
+}
+
+void gtdCheckEnumeration(string attrName, string typeName, string labels[], int count, bool normalize)
+{
+    AttrDef ad = find(gtdSetupModule, attrName)
+    AttrType at = null
+    if (!null ad) at = ad.type
+    else at = find(gtdSetupModule, typeName)
+    if (null at) return
+    // Existing String/Text definitions remain editable and retain their values.
+    if (!null ad && gtdTextType(at)) return
+    if (at.type != attrEnumeration) {
+        gtdSchemaErrors++
+        gtdLog("TYPE_CONFLICT | " typeName)
+        return
+    }
+    int i
+    for (i = 0; i < count; i++) {
+        if (!gtdHasEnumLabel(at, labels[i], normalize)) {
+            gtdSchemaErrors++
+            gtdLog("ENUM_VALUE_MISSING | " attrName " | " labels[i] " | enum preserved; extend/map explicitly")
+        }
+    }
+}
+
+void gtdEnsureAttribute(string name, bool moduleScope, string typeName)
+{
+    AttrDef ad = find(gtdSetupModule, name)
+    if (!null ad) {
+        gtdLog("KEEP_ATTRIBUTE | " name)
+        return
+    }
+    noError()
+    if (moduleScope) ad = create module type typeName attribute name
+    else ad = create object type typeName (inherit false) attribute name
+    string err = lastError()
+    if (null ad || !gtdBlank(err)) gtdFail("ATTRIBUTE_CREATE_FAILED | " name " | " err)
+    gtdCreatedAttrs++
+    gtdLog("CREATE_ATTRIBUTE | " name)
+}
+
+void gtdEnsureEnumeration(string attrName, string typeName, string labels[], int count)
+{
+    AttrDef ad = find(gtdSetupModule, attrName)
+    if (!null ad) {
+        gtdLog("KEEP_ATTRIBUTE | " attrName)
+        return
+    }
+    AttrType at = find(gtdSetupModule, typeName)
+    if (null at) {
+        int values[count]
+        int i
+        for (i = 0; i < count; i++) values[i] = i+1
+        string err = ""
+        noError()
+        at = create(typeName, labels, values, err)
+        string runtimeErr = lastError()
+        if (null at || !gtdBlank(err) || !gtdBlank(runtimeErr))
+            gtdFail("ENUM_CREATE_FAILED | " typeName " | " err " " runtimeErr)
+        gtdLog("CREATE_TYPE | " typeName)
+    }
+    gtdEnsureAttribute(attrName, false, typeName)
+}
+
+void gtdSetModuleString(string name, string value, bool onlyIfBlank)
+{
+    string old = gtdReadModuleString(name)
+    if (old == value || (onlyIfBlank && !gtdBlank(old))) return
+    noError()
+    gtdSetupModule.(name) = value
+    string err = lastError()
+    if (!gtdBlank(err)) gtdFail("MODULE_VALUE_FAILED | " name " | " err)
+    gtdLog("SET_MODULE_ATTRIBUTE | " name)
+}
+
+gtdLog("GTD SETUP | " fullName(gtdSetupModule))
+gtdLog("Existing object identities, links, enum definitions and requirement values are preserved.")
+int gtdI
+for (gtdI = 0; gtdI < 16; gtdI++) {
+    string kind = "Text"
+    if (gtdModuleStrings[gtdI] == "Classification") kind = "Choice"
+    gtdCheckAttribute(gtdModuleStrings[gtdI], true, kind)
+}
+gtdCheckAttribute("Document Date", true, "Date")
+for (gtdI = 0; gtdI < 4; gtdI++) gtdCheckAttribute(gtdObjectTexts[gtdI], false, "Text")
+gtdCheckAttribute("Requirement Source Reference", false, "Text")
+gtdCheckAttribute("Requirement Type", false, "Choice")
+gtdCheckAttribute("Verification Method", false, "Choice")
+gtdCheckAttribute("Requirement Source Type", false, "Choice")
+gtdCheckAttribute("GTD Section Key", false, "Key")
+gtdCheckEnumeration("Requirement Type", "GTD Requirement Type", gtdRequirementTypes, 11, true)
+gtdCheckEnumeration("Requirement Source Type", "GTD Requirement Source Type", gtdSourceTypes, 6, false)
+// Existing verification vocabularies are retained; only a missing attribute/type is initialized.
+AttrDef gtdExistingMethod = find(gtdSetupModule, "Verification Method")
+if (null gtdExistingMethod)
+    gtdCheckEnumeration("Verification Method", "GTD Verification Method", gtdVerificationMethods, 5, true)
+if (gtdSchemaErrors > 0) gtdFail("Schema conflicts found. No module changes were made.")
+
+// Capture the folder of the current package. Existing configured paths are retained.
+string gtdFolder = gtdReadModuleString("GTD Tool Folder")
+if (gtdBlank(gtdFolder)) gtdFolder = gtdFolderOf(gtdReadModuleString("GTD Publisher Script Path"))
+string gtdTracePath = gtdReadModuleString("GTD Trace Link Module")
+bool gtdProceed = false
+DB gtdSetupDb = create("GTD Modul Kurulumu", styleCentered | styleStandard)
+label(gtdSetupDb, "GUNCEL klasorunun tam yolunu girin. Mevcut dosya yolu attribute'lari korunur.")
+DBE gtdFolderField = field(gtdSetupDb, "GTD dosyalarinin klasoru:", gtdFolder, 65, false)
+DBE gtdTraceField = field(gtdSetupDb, "Kaynak link modulu (tam DOORS yolu):", gtdTracePath, 65, false)
+label(gtdSetupDb, "Link modulu henuz belirlenmediyse bos birakilabilir; yayin oncesinde doldurulur.")
+
+void gtdAcceptSetup(DB db)
+{
+    gtdFolder = gtdTrim(get(gtdFolderField))
+    if (gtdBlank(gtdFolder)) {
+        warningBox "GTD dosyalarinin klasor yolunu girin."
+        return
+    }
+    string enteredTrace = gtdTrim(get(gtdTraceField))
+    if (!gtdBlank(enteredTrace) && enteredTrace[0:0] != "/") {
+        warningBox "Kaynak link modulu / ile baslayan tam DOORS yolu olmali."
+        return
+    }
+    if (gtdBlank(gtdTracePath)) gtdTracePath = enteredTrace
+    else if (enteredTrace != gtdTracePath) {
+        warningBox "Mevcut GTD Trace Link Module degeri korunur. Degistirmek icin module attribute'unu duzenleyin."
+        return
+    }
+    gtdProceed = true
+    release db
+}
+
+void gtdCancelSetup(DB db)
+{
+    release db
+}
+
+ok(gtdSetupDb, "Kurulumu calistir", gtdAcceptSetup)
+close(gtdSetupDb, true, gtdCancelSetup)
+realize gtdSetupDb
+block gtdSetupDb
+destroy gtdSetupDb
+if (!gtdProceed) {
+    gtdLog("CANCELLED | No module changes were made.")
+    close(gtdLogStream)
+    halt
+}
+current = gtdSetupModule
+if (baseline(gtdSetupModule) || !isEdit(gtdSetupModule)) gtdFail("Module is no longer editable.")
+
+int gtdLast = length(gtdFolder)-1
+while (gtdLast >= 0 && (gtdFolder[gtdLast:gtdLast] == "\\" || gtdFolder[gtdLast:gtdLast] == "/")) gtdLast--
+if (gtdLast < 0) gtdFail("Invalid tool folder.")
+gtdFolder = gtdFolder[0:gtdLast]
+string gtdFormPath = gtdReadModuleString("GTD Form Path")
+string gtdTemplatePath = gtdReadModuleString("GTD Word Template Path")
+string gtdBuilderPath = gtdReadModuleString("GTD Publisher Script Path")
+if (gtdBlank(gtdFormPath)) gtdFormPath = gtdFolder "\\GTD_Module_Info.dxl"
+if (gtdBlank(gtdTemplatePath)) gtdTemplatePath = gtdFolder "\\TPL_GTD_Publisher.docx"
+if (gtdBlank(gtdBuilderPath)) gtdBuilderPath = gtdFolder "\\GTD_Build_Document.ps1"
+string gtdControlPath = gtdFolder "\\GTD_Requirement_Review_Control.dxl"
+if (!fileExists_(gtdFormPath)) gtdFail("FILE_MISSING | " gtdFormPath)
+if (!fileExists_(gtdTemplatePath)) gtdFail("FILE_MISSING | " gtdTemplatePath)
+if (!fileExists_(gtdBuilderPath)) gtdFail("FILE_MISSING | " gtdBuilderPath)
+if (!fileExists_(gtdControlPath)) gtdFail("FILE_MISSING | " gtdControlPath)
+string gtdControlCode = readFile(gtdControlPath)
+if (gtdBlank(gtdControlCode)) gtdFail("Control DXL could not be read.")
+
+// Create the internal state first. Any interrupted run remains visibly incomplete.
+gtdEnsureAttribute("GTD Setup State", true, "String")
+gtdMutationStarted = true
+gtdSetModuleString("GTD Setup State", "INCOMPLETE", false)
+for (gtdI = 0; gtdI < 16; gtdI++) gtdEnsureAttribute(gtdModuleStrings[gtdI], true, "String")
+gtdEnsureAttribute("Document Date", true, "Date")
+for (gtdI = 0; gtdI < 4; gtdI++) gtdEnsureAttribute(gtdObjectTexts[gtdI], false, "Text")
+gtdEnsureAttribute("Requirement Source Reference", false, "String")
+gtdEnsureAttribute("GTD Section Key", false, "String")
+gtdEnsureEnumeration("Requirement Type", "GTD Requirement Type", gtdRequirementTypes, 11)
+gtdEnsureEnumeration("Verification Method", "GTD Verification Method", gtdVerificationMethods, 5)
+gtdEnsureEnumeration("Requirement Source Type", "GTD Requirement Source Type", gtdSourceTypes, 6)
+gtdSetModuleString("GTD Template Version", "GTD_SETUP", true)
+gtdSetModuleString("GTD Form Path", gtdFormPath, true)
+gtdSetModuleString("GTD Word Template Path", gtdTemplatePath, true)
+gtdSetModuleString("GTD Publisher Script Path", gtdBuilderPath, true)
+gtdSetModuleString("GTD Trace Link Module", gtdTracePath, true)
+gtdSetModuleString("GTD Tool Folder", gtdFolder, false)
+
+// Scan the whole module, including objects hidden by a filter or outline.
+Object gtdCandidates[GTD_SECTION_COUNT]
+Object gtdResolved[GTD_SECTION_COUNT]
+int gtdCandidateCount[GTD_SECTION_COUNT]
+bool gtdIdentityConflict[GTD_SECTION_COUNT]
+for (gtdI = 0; gtdI < GTD_SECTION_COUNT; gtdI++) {
+    gtdCandidates[gtdI] = null
+    gtdResolved[gtdI] = null
+    gtdCandidateCount[gtdI] = 0
+    gtdIdentityConflict[gtdI] = false
+}
+Object gtdScan
+for gtdScan in entire gtdSetupModule do {
+    if (isDeleted(gtdScan)) continue
+    string issue = gtdSectionIdentityIssue(gtdScan)
+    if (issue != "") {
+        gtdReviewNeeded++
+        gtdLog("IDENTITY_CONFLICT | " identifier(gtdScan) " | " issue)
+        int storedIndex = gtdSectionIndex(gtdStoredSectionKey(gtdScan))
+        if (storedIndex >= 0) gtdIdentityConflict[storedIndex] = true
+        if (!table(gtdScan) && !row(gtdScan) && !cell(gtdScan)) {
+            int titleIndex = gtdSectionIndex(sectionKeyForHeading(gtdScan."Object Heading" ""))
+            if (titleIndex >= 0) gtdIdentityConflict[titleIndex] = true
+        }
+    }
+    string key = sectionKeyForObject(gtdScan)
+    int idx = gtdSectionIndex(key)
+    if (idx >= 0) {
+        gtdCandidateCount[idx]++
+        gtdCandidates[idx] = gtdScan
+        gtdLog("FOUND_HEADING | " key " | " identifier(gtdScan))
+    }
+}
+
+Object gtdCreateHeading(int idx, Object requiredParent)
+{
+    Object nextKnown = null
+    int j
+    for (j = idx+1; j < GTD_SECTION_COUNT; j++) {
+        if (gtdSectionParents[j] != gtdSectionParents[idx]) continue
+        if (gtdCandidateCount[j] != 1 || gtdIdentityConflict[j]) continue
+        Object candidate = gtdCandidates[j]
+        if (parent(candidate) == requiredParent) {
+            nextKnown = candidate
+            break
+        }
+    }
+    Object created = null
+    noError()
+    if (!null nextKnown) created = create before nextKnown
+    else if (!null requiredParent) created = create last below requiredParent
+    else {
+        // create(Module) PREPENDS, so use it only when there is no live root.
+        Object lastRoot = null
+        Object rootObject
+        for rootObject in entire gtdSetupModule do {
+            if (isDeleted(rootObject)) continue
+            if (null parent(rootObject)) lastRoot = rootObject
+        }
+        if (null lastRoot) created = create(gtdSetupModule)
+        else created = create after lastRoot
+    }
+    string err = lastError()
+    if (null created || !gtdBlank(err)) gtdFail("HEADING_CREATE_FAILED | " gtdSectionKeys[idx] " | " err)
+    noError()
+    created."Object Heading" = gtdSectionHeadings[idx]
+    created."GTD Section Key" = gtdSectionKeys[idx]
+    err = lastError()
+    if (!gtdBlank(err)) gtdFail("HEADING_VALUE_FAILED | " gtdSectionKeys[idx] " | " err)
+    gtdCreatedHeadings++
+    gtdLog("CREATE_HEADING | " gtdSectionKeys[idx] " | " identifier(created))
+    return created
+}
+
+for (gtdI = 0; gtdI < GTD_SECTION_COUNT; gtdI++) {
+    string sectionKey = gtdSectionKeys[gtdI]
+    int parentIdx = gtdSectionParents[gtdI]
+    Object expectedParent = null
+    if (parentIdx >= 0) expectedParent = gtdResolved[parentIdx]
+    if (gtdIdentityConflict[gtdI] || gtdCandidateCount[gtdI] > 1) {
+        gtdBlockedHeadings++
+        gtdLog("BLOCK_HEADING | " sectionKey " | duplicate or conflicting identity; no new heading")
+        continue
+    }
+    if (parentIdx >= 0 && null expectedParent) {
+        gtdBlockedHeadings++
+        gtdLog("BLOCK_HEADING | " sectionKey " | parent unresolved; no new heading")
+        continue
+    }
+    if (gtdCandidateCount[gtdI] == 1) {
+        Object existing = gtdCandidates[gtdI]
+        if (parent(existing) != expectedParent) {
+            gtdBlockedHeadings++
+            string parentLabel = "MODULE_ROOT"
+            if (!null expectedParent) parentLabel = identifier(expectedParent)
+            gtdLog("WRONG_PARENT | " sectionKey " | " identifier(existing) " | expected parent " parentLabel " | move manually, then rerun")
+            continue
+        }
+        if (gtdBlank(gtdStoredSectionKey(existing))) {
+            noError()
+            existing."GTD Section Key" = sectionKey
+            string err = lastError()
+            if (!gtdBlank(err)) gtdFail("HEADING_TAG_FAILED | " identifier(existing) " | " err)
+        }
+        gtdResolved[gtdI] = existing
+        gtdReusedHeadings++
+        gtdLog("REUSE_HEADING | " sectionKey " | " identifier(existing))
+    }
+    else gtdResolved[gtdI] = gtdCreateHeading(gtdI, expectedParent)
+}
+
+bool gtdViewExists(string viewName)
+{
+    string candidate
+    for candidate in views(gtdSetupModule) do
+        if (candidate == viewName) return true
+    return false
+}
+
+void gtdAppendColumn(string attrName, int colWidth)
+{
+    int n = 0
+    Column c
+    for c in gtdSetupModule do n++
+    c = insert column n
+    attribute(c, attrName)
+    title(c, attrName)
+    width(c, colWidth)
+}
+
+void gtdEnsureView(string viewName, bool review)
+{
+    bool viewAlreadyExists = gtdViewExists(viewName)
+    View v = view(viewName)
+    noError()
+    if (viewAlreadyExists) {
+        bool loaded = load(v)
+        string loadErr = lastError()
+        if (!loaded || !gtdBlank(loadErr)) gtdFail("VIEW_LOAD_FAILED | " viewName " | " loadErr)
+        if (!review) {
+            gtdLog("KEEP_VIEW | " viewName)
+            return
+        }
+    }
+    else {
+        bool standardLoaded = load(view("Standard view"))
+        string loadErr = lastError()
+        if (!standardLoaded || !gtdBlank(loadErr)) gtdFail("Standard view could not be loaded.")
+        // Only the unsaved display is rebuilt; no existing saved view is replaced.
+        Column c
+        int oldColumnCount = 0
+        for c in gtdSetupModule do oldColumnCount++
+        int ci
+        for (ci = 0; ci < oldColumnCount; ci++) delete(column 0)
+        c = insert column 0
+        attribute(c, "Object Identifier")
+        title(c, "ID")
+        width(c, 100)
+        c = insert column 1
+        main(c)
+        title(c, "Baslik / Metin")
+        width(c, 450)
+        gtdAppendColumn("Requirement Type", 140)
+        gtdAppendColumn("Verification Method", 130)
+        gtdAppendColumn("Verification Reference", 160)
+        gtdAppendColumn("Requirement Source Type", 175)
+        gtdAppendColumn("Requirement Source Reference", 210)
+        if (!review) {
+            gtdAppendColumn("Rationale", 200)
+            gtdAppendColumn("Remarks", 180)
+            gtdAppendColumn("Traceability Note", 200)
+        }
+    }
+    bool changed = !viewAlreadyExists
+    if (review) {
+        Column controlColumn = null
+        Column col
+        int n = 0
+        int controlCount = 0
+        for col in gtdSetupModule do {
+            if (title(col) == "Control") {
+                controlColumn = col
+                controlCount++
+            }
+            n++
+        }
+        if (controlCount > 1) {
+            gtdReviewNeeded++
+            gtdLog("VIEW_CONFLICT | Requirement Review has multiple Control columns; kept unchanged")
+            return
+        }
+        bool controlWasMissing = null controlColumn
+        if (controlWasMissing) {
+            controlColumn = insert column n
+            title(controlColumn, "Control")
+            width(controlColumn, 300)
+            changed = true
+        }
+        string oldCode = ""
+        if (!controlWasMissing && gtdBlank(attrName(controlColumn)) && !main(controlColumn)) oldCode = dxl(controlColumn)
+        else if (!controlWasMissing && viewAlreadyExists) {
+            gtdReviewNeeded++
+            gtdLog("VIEW_CONFLICT | Control title belongs to a non-DXL column; kept unchanged")
+            return
+        }
+        if (oldCode != gtdControlCode) {
+            dxl(controlColumn, gtdControlCode)
+            changed = true
+        }
+    }
+    if (changed) {
+        noError()
+        refresh(gtdSetupModule)
+        string refreshErr = lastError()
+        if (!gtdBlank(refreshErr)) gtdFail("VIEW_REFRESH_FAILED | " viewName " | " refreshErr)
+        noError()
+        if (viewAlreadyExists) save(v)
+        else {
+            // Default view access inheritance is retained; no module ACL is changed.
+            ViewDef def = create(gtdSetupModule, true)
+            useWindows(def, false)
+            save(gtdSetupModule, v, def)
+        }
+        string err = lastError()
+        if (!gtdBlank(err)) gtdFail("VIEW_SAVE_FAILED | " viewName " | " err)
+        if (viewAlreadyExists) {
+            gtdUpdatedViews++
+            gtdLog("UPDATE_CONTROL_ONLY | " viewName)
+        }
+        else {
+            gtdCreatedViews++
+            gtdLog("CREATE_VIEW | " viewName)
+        }
+    }
+    else gtdLog("KEEP_VIEW | " viewName)
+}
+
+gtdEnsureView("Requirement Entry", false)
+gtdEnsureView("Requirement Review", true)
+noError()
+bool gtdReviewLoaded = load(view("Requirement Review"))
+string gtdReviewLoadError = lastError()
+if (!gtdReviewLoaded || !gtdBlank(gtdReviewLoadError)) gtdFail("Requirement Review view could not be loaded.")
+string gtdFinalState = "READY"
+if (gtdBlockedHeadings > 0 || gtdReviewNeeded > 0) gtdFinalState = "NEEDS_REVIEW"
+gtdSetModuleString("GTD Setup State", gtdFinalState, false)
+noError()
+save(gtdSetupModule)
+string gtdSaveError = lastError()
+if (!gtdBlank(gtdSaveError)) gtdFail("MODULE_SAVE_FAILED | " gtdSaveError)
+gtdLog("SUMMARY | state=" gtdFinalState " | attributes created=" gtdCreatedAttrs " | headings created=" gtdCreatedHeadings " | headings reused=" gtdReusedHeadings " | headings blocked=" gtdBlockedHeadings " | views created=" gtdCreatedViews " | views updated=" gtdUpdatedViews)
+gtdLog("Move existing requirements as existing objects under the proper headings; fill missing values manually.")
+gtdLog("No baseline was created. Document Revision, Document Date and Prefix were not assigned by setup.")
+close(gtdLogStream)
+ack "GTD setup tamamlandi.\nDurum: " gtdFinalState "\n\nOlusturulan baslik: " gtdCreatedHeadings "\nKullanilan mevcut baslik: " gtdReusedHeadings "\nCozum bekleyen baslik: " gtdBlockedHeadings "\n\nLog:\n" gtdLogPath "\n\nGereksinimleri uygun basliklarin altina mevcut nesneleriyle tasiyin."
+
+// The metadata dialog is part of the same entry-point run when data is missing.
+// It saves only on the user's Kaydet action, using the existing project form.
+bool gtdInfoMissing = gtdBlank(gtdReadModuleString("System Name")) ||
+    gtdBlank(gtdReadModuleString("Document Number")) ||
+    gtdBlank(gtdReadModuleString("Document Revision")) ||
+    gtdBlank(gtdReadModuleString("Project Name")) ||
+    gtdBlank(gtdReadModuleString("Project Number")) ||
+    gtdBlank(gtdReadModuleString("Department")) ||
+    gtdBlank(gtdReadModuleString("Classification")) ||
+    gtdBlank(gtdSetupModule."Prefix" "")
+Date gtdInfoDate = gtdSetupModule."Document Date"
+if (null gtdInfoDate) gtdInfoMissing = true
+if (gtdInfoMissing && gtdFinalState == "READY") {
+    string formCode = readFile(gtdFormPath)
+    if (!gtdBlank(formCode)) {
+        string formError = eval_(formCode)
+        if (!gtdBlank(formError)) ack "GTD_Module_Info formu calistirilamadi:\n" formError
+    }
+}

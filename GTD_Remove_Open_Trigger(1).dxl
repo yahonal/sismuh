@@ -1,0 +1,26 @@
+// ============================================================
+// GTD_Remove_Open_Trigger.dxl
+// Removes GTD_Module_Open_Check from the CURRENT PROJECT.
+// ============================================================
+
+pragma runLim, 0
+
+Project gtdProject = current Project
+
+if (null gtdProject) {
+    ack "Once trigger'in bulundugu projeyi current project yapin."
+    halt
+}
+
+string gtdDeleteError = delete(
+    "GTD_Module_Open_Check",
+    module->all->formal,
+    post,
+    open,
+    10
+)
+
+if (null gtdDeleteError)
+    ack "GTD_Module_Open_Check kaldirildi."
+else
+    ack "Trigger kaldirilamadi veya zaten yok.\n\n" gtdDeleteError

@@ -1,0 +1,204 @@
+// ============================================================
+// GTD_Install_Open_Trigger.dxl
+//
+// Installs/replaces one persistent trigger in the CURRENT PROJECT:
+//
+//   Name     : GTD_Module_Open_Check
+//   Scope    : module->all->formal
+//   Type     : post
+//   Event    : open
+//   Priority : 10
+//
+// Run once with the intended DOORS project current/selected.
+// Requires modify access to that project.
+// ============================================================
+
+pragma runLim, 0
+
+Project gtdProject = current Project
+
+if (null gtdProject) {
+    ack "Once trigger'in kurulacagi projeyi current project yapin."
+    halt
+}
+
+// Replace the previous trigger with the same agreed identity.
+// A delete error is ignored because it also occurs when no old trigger exists.
+string gtdDeleteError = delete(
+    "GTD_Module_Open_Check",
+    module->all->formal,
+    post,
+    open,
+    10
+)
+
+Buffer gtdTriggerCode = create
+
+    gtdTriggerCode += "// ============================================================\n"
+    gtdTriggerCode += "// GTD_Open_Check.dxl\n"
+    gtdTriggerCode += "// Body used by persistent trigger: GTD_Module_Open_Check\n"
+    gtdTriggerCode += "// Scope: current project -> all formal modules\n"
+    gtdTriggerCode += "// Event: post open\n"
+    gtdTriggerCode += "// Priority: 10\n"
+    gtdTriggerCode += "//\n"
+    gtdTriggerCode += "// A module is treated as a GTD module only when it has:\n"
+    gtdTriggerCode += "//   GTD Template Version\n"
+    gtdTriggerCode += "//   GTD Form Path\n"
+    gtdTriggerCode += "//\n"
+    gtdTriggerCode += "// Required values checked:\n"
+    gtdTriggerCode += "//   Prefix\n"
+    gtdTriggerCode += "//   System Name\n"
+    gtdTriggerCode += "//   Document Number\n"
+    gtdTriggerCode += "//   Document Revision\n"
+    gtdTriggerCode += "//   Document Date\n"
+    gtdTriggerCode += "//   Project Name\n"
+    gtdTriggerCode += "//   Project Number\n"
+    gtdTriggerCode += "//   Department\n"
+    gtdTriggerCode += "//   Classification\n"
+    gtdTriggerCode += "//\n"
+    gtdTriggerCode += "// Optional:\n"
+    gtdTriggerCode += "//   Work Package\n"
+    gtdTriggerCode += "//   SDVIL Number\n"
+    gtdTriggerCode += "//\n"
+    gtdTriggerCode += "// When required data is missing, reads GTD Form Path once and eval_()s\n"
+    gtdTriggerCode += "// GTD_Module_Info.dxl once.\n"
+    gtdTriggerCode += "// ============================================================\n"
+    gtdTriggerCode += "\n"
+    gtdTriggerCode += "pragma runLim, 0\n"
+    gtdTriggerCode += "\n"
+    gtdTriggerCode += "void gtdAppendMissing(Buffer b, string fieldName)\n"
+    gtdTriggerCode += "{\n"
+    gtdTriggerCode += "    if (length(stringOf(b)) > 0)\n"
+    gtdTriggerCode += "        b += \"\\n\"\n"
+    gtdTriggerCode += "\n"
+    gtdTriggerCode += "    b += fieldName\n"
+    gtdTriggerCode += "}\n"
+    gtdTriggerCode += "\n"
+    gtdTriggerCode += "void gtdRunOpenCheck()\n"
+    gtdTriggerCode += "{\n"
+    gtdTriggerCode += "    Trigger gtdTrigger = current()\n"
+    gtdTriggerCode += "\n"
+    gtdTriggerCode += "    // For a post-open module trigger, this obtains the opened module.\n"
+    gtdTriggerCode += "    // The 0 variant also allows correct baseline detection.\n"
+    gtdTriggerCode += "    Module gtdModule = module(gtdTrigger, 0)\n"
+    gtdTriggerCode += "\n"
+    gtdTriggerCode += "    if (null gtdModule)\n"
+    gtdTriggerCode += "        return\n"
+    gtdTriggerCode += "\n"
+    gtdTriggerCode += "    if (baseline(gtdModule))\n"
+    gtdTriggerCode += "        return\n"
+    gtdTriggerCode += "\n"
+    gtdTriggerCode += "    AttrDef adVersion = find(gtdModule, \"GTD Template Version\")\n"
+    gtdTriggerCode += "    AttrDef adFormPath = find(gtdModule, \"GTD Form Path\")\n"
+    gtdTriggerCode += "\n"
+    gtdTriggerCode += "    // Not a GTD module: silently ignore.\n"
+    gtdTriggerCode += "    if (null adVersion || null adFormPath)\n"
+    gtdTriggerCode += "        return\n"
+    gtdTriggerCode += "\n"
+    gtdTriggerCode += "    if (!adVersion.module || !adFormPath.module)\n"
+    gtdTriggerCode += "        return\n"
+    gtdTriggerCode += "\n"
+    gtdTriggerCode += "    string templateVersion = gtdModule.\"GTD Template Version\" \"\"\n"
+    gtdTriggerCode += "    string formPath = gtdModule.\"GTD Form Path\" \"\"\n"
+    gtdTriggerCode += "\n"
+    gtdTriggerCode += "    // GTD setup marker is not configured: silently ignore.\n"
+    gtdTriggerCode += "    if (templateVersion == \"\" || formPath == \"\")\n"
+    gtdTriggerCode += "        return\n"
+    gtdTriggerCode += "\n"
+    gtdTriggerCode += "    Buffer missing = create\n"
+    gtdTriggerCode += "\n"
+    gtdTriggerCode += "    // Built-in module Prefix.\n"
+    gtdTriggerCode += "    string modulePrefix = gtdModule.\"Prefix\" \"\"\n"
+    gtdTriggerCode += "\n"
+    gtdTriggerCode += "    if (modulePrefix == \"\")\n"
+    gtdTriggerCode += "        gtdAppendMissing(missing, \"Prefix\")\n"
+    gtdTriggerCode += "\n"
+    gtdTriggerCode += "    string requiredStringAttrs[] = {\n"
+    gtdTriggerCode += "        \"System Name\",\n"
+    gtdTriggerCode += "        \"Document Number\",\n"
+    gtdTriggerCode += "        \"Document Revision\",\n"
+    gtdTriggerCode += "        \"Project Name\",\n"
+    gtdTriggerCode += "        \"Project Number\",\n"
+    gtdTriggerCode += "        \"Department\",\n"
+    gtdTriggerCode += "        \"Classification\"\n"
+    gtdTriggerCode += "    }\n"
+    gtdTriggerCode += "\n"
+    gtdTriggerCode += "    int i\n"
+    gtdTriggerCode += "\n"
+    gtdTriggerCode += "    for (i = 0; i < 7; i++) {\n"
+    gtdTriggerCode += "        string attrName = requiredStringAttrs[i]\n"
+    gtdTriggerCode += "        AttrDef ad = find(gtdModule, attrName)\n"
+    gtdTriggerCode += "\n"
+    gtdTriggerCode += "        if (null ad || !ad.module) {\n"
+    gtdTriggerCode += "            gtdAppendMissing(missing, attrName \" [attribute missing]\")\n"
+    gtdTriggerCode += "        }\n"
+    gtdTriggerCode += "        else {\n"
+    gtdTriggerCode += "            string value = gtdModule.(attrName) \"\"\n"
+    gtdTriggerCode += "\n"
+    gtdTriggerCode += "            if (value == \"\")\n"
+    gtdTriggerCode += "                gtdAppendMissing(missing, attrName)\n"
+    gtdTriggerCode += "        }\n"
+    gtdTriggerCode += "    }\n"
+    gtdTriggerCode += "\n"
+    gtdTriggerCode += "    AttrDef adDate = find(gtdModule, \"Document Date\")\n"
+    gtdTriggerCode += "\n"
+    gtdTriggerCode += "    if (null adDate || !adDate.module) {\n"
+    gtdTriggerCode += "        gtdAppendMissing(missing, \"Document Date [attribute missing]\")\n"
+    gtdTriggerCode += "    }\n"
+    gtdTriggerCode += "    else {\n"
+    gtdTriggerCode += "        Date documentDate = gtdModule.\"Document Date\"\n"
+    gtdTriggerCode += "\n"
+    gtdTriggerCode += "        if (null documentDate)\n"
+    gtdTriggerCode += "            gtdAppendMissing(missing, \"Document Date\")\n"
+    gtdTriggerCode += "    }\n"
+    gtdTriggerCode += "\n"
+    gtdTriggerCode += "    string missingText = stringOf(missing)\n"
+    gtdTriggerCode += "\n"
+    gtdTriggerCode += "    if (missingText == \"\") {\n"
+    gtdTriggerCode += "        delete(missing)\n"
+    gtdTriggerCode += "        return\n"
+    gtdTriggerCode += "    }\n"
+    gtdTriggerCode += "\n"
+    gtdTriggerCode += "    if (!fileExists_(formPath)) {\n"
+    gtdTriggerCode += "        warningBox \"GTD module bilgileri eksik fakat form dosyasi bulunamadi.\\n\\nGTD Form Path:\\n\" formPath \"\\n\\nEksik alanlar:\\n\" missingText\n"
+    gtdTriggerCode += "        delete(missing)\n"
+    gtdTriggerCode += "        return\n"
+    gtdTriggerCode += "    }\n"
+    gtdTriggerCode += "\n"
+    gtdTriggerCode += "    string formCode = readFile(formPath)\n"
+    gtdTriggerCode += "\n"
+    gtdTriggerCode += "    if (formCode == \"\") {\n"
+    gtdTriggerCode += "        warningBox \"GTD form dosyasi okunamadi veya bos:\\n\\n\" formPath\n"
+    gtdTriggerCode += "        delete(missing)\n"
+    gtdTriggerCode += "        return\n"
+    gtdTriggerCode += "    }\n"
+    gtdTriggerCode += "\n"
+    gtdTriggerCode += "    // Run the shared form exactly once.\n"
+    gtdTriggerCode += "    string evalError = eval_(formCode)\n"
+    gtdTriggerCode += "\n"
+    gtdTriggerCode += "    if (evalError != \"\") {\n"
+    gtdTriggerCode += "        warningBox \"GTD_Module_Info.dxl calistirilirken hata olustu:\\n\\n\" evalError\n"
+    gtdTriggerCode += "    }\n"
+    gtdTriggerCode += "\n"
+    gtdTriggerCode += "    delete(missing)\n"
+    gtdTriggerCode += "}\n"
+    gtdTriggerCode += "\n"
+    gtdTriggerCode += "gtdRunOpenCheck()\n"
+
+Trigger gtdInstalledTrigger = trigger(
+    "GTD_Module_Open_Check",
+    module->all->formal,
+    post,
+    open,
+    10,
+    stringOf(gtdTriggerCode)
+)
+
+delete(gtdTriggerCode)
+
+if (null gtdInstalledTrigger) {
+    ack "GTD_Module_Open_Check trigger'i kurulamadi.\n\nProje modify yetkisini ve current project secimini kontrol edin."
+    halt
+}
+
+ack "GTD_Module_Open_Check kuruldu.\n\nScope: current project / all formal modules\nEvent: post open\nPriority: 10"
