@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>İşten saat kaçta çıkmalıyım?</title>
+<style>
+  :root {
+    --bg: #E9EEF2; --card: #FFFFFF; --ink: #1D2733; --muted: #677384; --line: #D3DAE1;
+    --accent: #4B3FA0; --accent-soft: #ECE9FA; --on-accent: #FFFFFF; --pos: #1F7A4D; --neg: #B3261E;
+    box-sizing: border-box;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #141A21; --card: #1D252E; --ink: #E6EBF0; --muted: #98A3B0; --line: #2E3945;
+      --accent: #A89BF2; --accent-soft: #2A2548; --on-accent: #141A21; --pos: #5FCB93; --neg: #F08A82;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #141A21; --card: #1D252E; --ink: #E6EBF0; --muted: #98A3B0; --line: #2E3945;
+    --accent: #A89BF2; --accent-soft: #2A2548; --on-accent: #141A21; --pos: #5FCB93; --neg: #F08A82;
+  }
+  *, *::before, *::after { box-sizing: inherit; }
+  html { scroll-padding-top: env(safe-area-inset-top, 0px); }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font-family: "Barlow", "Segoe UI", system-ui, sans-serif; font-size: 1rem; line-height: 1.5;
+  }
+  main { max-width: 34rem; margin: 0 auto; padding: 2rem 1.25rem 3rem; }
+  h1 {
+    font-family: "Barlow Semi Condensed", "Arial Narrow", sans-serif;
+    font-weight: 700; font-size: clamp(1.9rem, 6vw, 2.5rem); line-height: 1.05; margin: 0 0 1.25rem;
+  }
+
+  .seg {
+    display: inline-flex; background: var(--card); border: 1px solid var(--line);
+    border-radius: 999px; padding: 4px; margin-bottom: 1.25rem;
+  }
+  .seg button {
+    font: 600 1rem "Barlow", "Segoe UI", sans-serif; color: var(--muted);
+    background: transparent; border: 0; border-radius: 999px; padding: .45rem 1.1rem; cursor: pointer;
+  }
+  .seg button[aria-pressed="true"] { background: var(--accent); color: var(--on-accent); }
+  .seg button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+
+  .inputs { display: grid; grid-template-columns: 1fr 1fr; gap: .75rem; margin-bottom: 1.25rem; }
+  label { display: block; font-weight: 500; font-size: .95rem; margin-bottom: .3rem; }
+  input[type="time"] {
+    width: 100%; font: 600 1.6rem "Barlow Semi Condensed", "Arial Narrow", sans-serif;
+    color: var(--ink); background: var(--card); border: 2px solid var(--line); border-radius: 10px;
+    padding: .5rem .7rem;
+  }
+  input[type="time"]:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; border-color: var(--accent); }
+
+  .result { background: var(--card); border-radius: 14px; border: 1px solid var(--line); overflow: hidden; transition: opacity .2s; }
+  .headline { padding: 1.25rem 1.25rem 1rem; border-bottom: 2px dashed var(--line); }
+  .headline .lbl { color: var(--muted); font-size: .95rem; }
+  .big {
+    font-family: "Barlow Semi Condensed", "Arial Narrow", sans-serif; font-weight: 700;
+    font-size: clamp(2.8rem, 12vw, 3.8rem); line-height: 1; margin: .2rem 0 .35rem;
+    font-variant-numeric: tabular-nums;
+  }
+  .big.pos { color: var(--pos); } .big.neg { color: var(--neg); }
+  .hint { margin: 0; font-size: .98rem; }
+  .hint strong { font-weight: 600; }
+
+  .ledger { list-style: none; margin: 0; padding: .6rem 1.25rem 1rem; }
+  .ledger li { display: flex; justify-content: space-between; gap: 1rem; padding: .4rem 0; font-variant-numeric: tabular-nums; }
+  .ledger li .v { font-family: "Barlow Semi Condensed", "Arial Narrow", sans-serif; font-weight: 600; font-size: 1.1rem; white-space: nowrap; }
+  .ledger li.minus .v { color: var(--muted); }
+  .ledger li.total { border-top: 1px solid var(--line); margin-top: .2rem; padding-top: .6rem; font-weight: 600; }
+  .note { font-size: .85rem; color: var(--muted); display: block; font-weight: 400; }
+
+  .error {
+    display: none; margin: 0 0 1rem; padding: .75rem 1rem; border-radius: 10px;
+    background: var(--card); border-left: 4px solid var(--neg);
+  }
+
+  h2 { font-size: 1.05rem; font-weight: 600; margin: 2rem 0 .6rem; }
+  .tablewrap { overflow-x: auto; }
+  .tiers { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+  .tiers td { padding: .5rem .6rem; border-bottom: 1px solid var(--line); }
+  .tiers td:last-child { text-align: right; font-weight: 600; }
+  .tiers tr.on td { background: var(--accent-soft); }
+  .tiers tr.on td:first-child { box-shadow: inset 4px 0 0 var(--accent); }
+
+  @media (max-width: 380px) { .inputs { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<main>
+  <h1>İşten saat kaçta çıkmalıyım?</h1>
+
+  <div class="seg" role="group" aria-label="Gün türü">
+    <button type="button" data-mod="ici">Hafta içi</button>
+    <button type="button" data-mod="sonu">Hafta sonu</button>
+  </div>
+
+  <div class="inputs">
+    <div>
+      <label for="giris">Giriş saati</label>
+      <input type="time" id="giris" value="08:40">
+    </div>
+    <div>
+      <label for="cikis">Hedeflenen çıkış</label>
+      <input type="time" id="cikis" value="17:28">
+    </div>
+  </div>
+
+  <p class="error" id="error" role="alert">Çıkış saati giriş saatinden sonra olmalı.</p>
+
+  <section class="result" id="result" aria-live="polite">
+    <div class="headline">
+      <div class="lbl">Esnek bakiye</div>
+      <div class="big" id="net">—</div>
+      <p class="hint" id="hint"></p>
+    </div>
+    <ul class="ledger" id="ledger"></ul>
+  </section>
+
+  <h2 id="tier-baslik">Dinlenme kuralı (şirket kesintisi düşüldükten sonraki çalışmaya göre)</h2>
+  <p class="note" id="tier-not" style="margin:-.3rem 0 .6rem">1 saatlik öğle arası dinlenmeden sayılır, sadece fazlası düşülür.</p>
+  <div class="tablewrap">
+    <table class="tiers">
+      <tbody id="tiers">
+        <tr data-i="0"><td>0:00 – 3:00</td><td>0 dk</td></tr>
+        <tr data-i="1"><td>3:01 – 8:05</td><td>30 dk</td></tr>
+        <tr data-i="2"><td>8:06 – 11:00</td><td>1 sa</td></tr>
+        <tr data-i="3"><td>11:01 – 15:00</td><td>1 sa 30 dk</td></tr>
+      </tbody>
+    </table>
+  </div>
+</main>
+
+<script>
+  // Tüm süreler dakika cinsinden.
+  // Her gün aynı sıra:
+  //   net çalışma = süre − öğle arası; brüt = net çalışma − beklenen;
+  //   brüt 15 dk veya üstündeyse şirket kesintisi;
+  //   dinlenme (net çalışma − kesinti) süresine göre bulunur;
+  //   öğle arası dinlenmeden sayıldığı için sadece fazlası (ek dinlenme) düşülür.
+  const MODLAR = {
+    ici:  { beklenen: 480, ogle: 60 },
+    sonu: { beklenen: 0,   ogle: 0 }
+  };
+  const KESINTI = 15; // kalan süre 15 dk veya üstündeyse düşülür
+
+  // Dinlenme dilimleri: süre üst sınırı (dk) -> dinlenme (dk)
+  const DILIMLER = [
+    { ust: 180, dinlenme: 0 },   // 0:00 – 3:00
+    { ust: 485, dinlenme: 30 },  // 3:01 – 8:05
+    { ust: 660, dinlenme: 60 },  // 8:06 – 11:00
+    { ust: 900, dinlenme: 90 }   // 11:01 – 15:00
+  ];
+
+  let mod = [0, 6].includes(new Date().getDay()) ? "sonu" : "ici";
+  const $ = id => document.getElementById(id);
+
+  function dakikaya(hhmm) {
+    if (!hhmm) return null;
+    const [h, m] = hhmm.split(":").map(Number);
+    return h * 60 + m;
+  }
+  function sureYaz(dk, isaretli = false) {
+    const isaret = dk < 0 ? "− " : (isaretli && dk > 0 ? "+ " : "");
+    const a = Math.abs(dk);
+    return isaret + Math.floor(a / 60) + ":" + String(a % 60).padStart(2, "0");
+  }
+  function saatYaz(dk) {
+    const g = ((dk % 1440) + 1440) % 1440;
+    return String(Math.floor(g / 60)).padStart(2, "0") + ":" + String(g % 60).padStart(2, "0");
+  }
+  function dilimBul(sure) {
+    if (sure <= 0) return { i: -1, dinlenme: 0 };
+    for (let i = 0; i < DILIMLER.length; i++) {
+      if (sure <= DILIMLER[i].ust) return { i, dinlenme: DILIMLER[i].dinlenme };
+    }
+    return { i: DILIMLER.length - 1, dinlenme: 90, asim: true }; // 15 saat üstü tanımsız
+  }
+
+  function hesap(sure, m) {
+    const netCalisma = sure - m.ogle;
+    const brut = netCalisma - m.beklenen;
+    const kesinti = brut >= KESINTI ? KESINTI : 0; // eksikte ve 15 dk altında kesinti yok
+    const dinlenmeTabani = netCalisma - kesinti;    // dinlenme bu süreye göre
+    const d = dilimBul(dinlenmeTabani);
+    const dinlenme = Math.max(d.dinlenme - m.ogle, 0);
+    const net = brut - kesinti - dinlenme;
+    return { d, netCalisma, dinlenmeTabani, brut, kesinti, dinlenme, net };
+  }
+
+  // Bakiyeyi 0 veya üstüne getiren en kısa süre
+  function sifirSuresi(m, maks) {
+    for (let s = 0; s <= maks; s++) if (hesap(s, m).net >= 0) return s;
+    return null;
+  }
+
+  function satir(ad, deger, sinif = "", not = "") {
+    const notHtml = not ? `<span class="note">${not}</span>` : "";
+    return `<li class="${sinif}"><span>${ad}${notHtml}</span><span class="v">${deger}</span></li>`;
+  }
+
+  function hesapla() {
+    const m = MODLAR[mod];
+    const giris = dakikaya($("giris").value);
+    const cikis = dakikaya($("cikis").value);
+    const gecerli = giris !== null && cikis !== null && cikis > giris;
+
+    $("error").style.display = (giris !== null && cikis !== null && !gecerli) ? "block" : "none";
+    $("result").style.opacity = gecerli ? "1" : ".35";
+    if (!gecerli) return;
+
+    const sure = cikis - giris;
+    const r = hesap(sure, m);
+
+    const kesintiNot = r.kesinti ? ""
+      : (r.brut < 0 ? "Beklenen süre dolmadığı için kesinti yok" : "15 dk'nın altında olduğu için kesinti yok");
+    const asimNot = r.d.asim ? "15 saat üstü için kural yok, 1 sa 30 dk uygulandı. " : "";
+
+    let html = satir("İşyerinde geçen süre", sureYaz(sure));
+    if (m.ogle > 0) {
+      html += satir("Öğle arası", "− " + sureYaz(m.ogle), "minus");
+      html += satir("Net çalışma", sureYaz(r.netCalisma), "total");
+    }
+    html += satir("Beklenen çalışma", "− " + sureYaz(m.beklenen), "minus");
+    html += satir("Brüt esnek bakiye", sureYaz(r.brut, true), "total");
+    html += satir("Şirket kesintisi", "− " + sureYaz(r.kesinti), "minus", kesintiNot);
+    const dinlenmeNot = asimNot + `${sureYaz(r.dinlenmeTabani)} için dinlenme ${sureYaz(r.d.dinlenme)}`
+      + (m.ogle > 0 ? ", öğle arası 1:00 düşüldü" : "");
+    html += satir(m.ogle > 0 ? "Ek dinlenme" : "Dinlenme süresi", "− " + sureYaz(r.dinlenme), "minus", dinlenmeNot);
+    html += satir("Esnek bakiye", sureYaz(r.net, true), "total");
+    $("ledger").innerHTML = html;
+
+    const big = $("net");
+    big.textContent = sureYaz(r.net, true);
+    big.className = "big " + (r.net > 0 ? "pos" : r.net < 0 ? "neg" : "");
+
+    if (r.net < 0) {
+      const s0 = sifirSuresi(m, 1439 - giris);
+      $("hint").innerHTML = s0 === null
+        ? "Bu giriş saatiyle gün içinde bakiye sıfırlanmıyor."
+        : `Bakiyenin eksiye düşmemesi için en erken <strong>${saatYaz(giris + s0)}</strong>'de çıkabilirsin.`;
+    } else if (r.net > 0) {
+      $("hint").innerHTML = `Bu çıkışla bakiyene <strong>${sureYaz(r.net)}</strong> ekleniyor.`;
+    } else {
+      $("hint").textContent = "Bu çıkışla bakiye sıfır.";
+    }
+
+    document.querySelectorAll("#tiers tr").forEach(tr => {
+      tr.classList.toggle("on", Number(tr.dataset.i) === r.d.i);
+    });
+  }
+
+  function modSec(yeni) {
+    mod = yeni;
+    $("tier-not").style.display = mod === "ici" ? "block" : "none";
+    document.querySelectorAll(".seg button").forEach(b => {
+      b.setAttribute("aria-pressed", String(b.dataset.mod === mod));
+    });
+    hesapla();
+  }
+
+  document.querySelectorAll(".seg button").forEach(b => b.addEventListener("click", () => modSec(b.dataset.mod)));
+  $("giris").addEventListener("input", hesapla);
+  $("cikis").addEventListener("input", hesapla);
+  modSec(mod);
+</script>
+</body>
+</html>
